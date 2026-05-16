@@ -4,11 +4,13 @@ import { runImageGen } from '../core/image-orchestrator.js';
 import { isValidProvider } from '../providers/index.js';
 import type { ImageGenResult, ProviderName } from '../types.js';
 
-const IMAGE_PROVIDERS: ProviderName[] = ['chatgpt', 'gemini'];
+const IMAGE_PROVIDERS: ProviderName[] = ['chatgpt', 'gemini', 'grok'];
 
 export function createImageCommand(): Command {
   const cmd = new Command('image')
-    .description('Generate images via ChatGPT (DALL-E) or Gemini (Imagen) with browser automation')
+    .description(
+      'Generate images via ChatGPT (DALL-E), Gemini (Imagen), or Grok with browser automation',
+    )
     .requiredOption('-p, --prompt <text>', 'The image generation prompt')
     .option('--provider <name>', `Provider (${IMAGE_PROVIDERS.join(', ')})`, 'chatgpt')
     .option('--headed', 'Show browser window')

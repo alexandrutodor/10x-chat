@@ -561,7 +561,7 @@ export const geminiActions: ProviderActions = {
         const h = (img as HTMLImageElement).naturalHeight;
         if (w > 0 && w < 64 && h > 0 && h < 64) continue;
         seen.add(src);
-        const fullSizeUrl = src.includes('=s') ? src : `${src}=s1024-rj`;
+        const fullSizeUrl = src.startsWith('blob:') || src.includes('=s') ? src : `${src}=s1024-rj`;
         results.push({
           url: fullSizeUrl,
           alt: img.getAttribute('alt') ?? '',

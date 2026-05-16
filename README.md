@@ -73,18 +73,18 @@ npx 10x-chat@latest chat -p "Long task" --timeout 600000 --headed  # 10min timeo
 
 ### `image`
 
-Generate images via ChatGPT (DALL-E) or Gemini (Imagen) with non-blocking polling.
+Generate images via ChatGPT (DALL-E), Gemini (Imagen), or Grok with non-blocking polling.
 
 ```bash
 npx 10x-chat@latest image -p "A fox astronaut in space, digital art" --provider chatgpt
 npx 10x-chat@latest image -p "Watercolor landscape" --provider gemini --save-dir ./images
-npx 10x-chat@latest image -p "Logo design" --headed --timeout 120000
+npx 10x-chat@latest image -p "Logo design" --provider grok --headed --timeout 120000
 ```
 
 | Flag | Description |
 |------|-------------|
 | `-p, --prompt <text>` | **(required)** The image generation prompt |
-| `--provider <name>` | Provider: `chatgpt`, `gemini` (default: chatgpt) |
+| `--provider <name>` | Provider: `chatgpt`, `gemini`, `grok` (default: chatgpt) |
 | `--headed` | Show browser window |
 | `--timeout <ms>` | Generation timeout (default: 120000) |
 | `--save-dir <dir>` | Directory to save generated images |
@@ -225,10 +225,10 @@ This lets agents like Codex or Claude Code use 10x-chat to query other models fo
 
 | Provider | Status | Models | URL |
 |----------|--------|--------|-----|
-| ChatGPT | ✅ | — | chatgpt.com |
-| Gemini | ✅ | Fast, **Thinking** (default), Deep Think, Pro | gemini.google.com |
-| Claude | ✅ | — | claude.ai |
-| Grok | ✅ | — | grok.com |
+| ChatGPT | ✅ chat + image | — | chatgpt.com |
+| Gemini | ✅ chat + image | Fast, **Thinking** (default), Deep Think, Pro | gemini.google.com |
+| Claude | ✅ chat | — | claude.ai |
+| Grok | ✅ chat + image | — | grok.com |
 | Perplexity | ✅ | — | perplexity.ai |
 | NotebookLM | ✅ | — | notebooklm.google.com |
 

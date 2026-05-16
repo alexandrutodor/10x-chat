@@ -120,7 +120,7 @@ const geminiImageGen: ImageGenProviderConfig = {
         const h = (img as HTMLImageElement).naturalHeight;
         if (w > 0 && w < 64 && h > 0 && h < 64) continue;
         seen.add(src);
-        const fullSizeUrl = src.includes('=s') ? src : `${src}=s1024-rj`;
+        const fullSizeUrl = src.startsWith('blob:') || src.includes('=s') ? src : `${src}=s1024-rj`;
         results.push({
           url: fullSizeUrl,
           alt: img.getAttribute('alt') ?? '',
@@ -140,10 +140,85 @@ const geminiImageGen: ImageGenProviderConfig = {
   },
 };
 
+const grokImageGen: ImageGenProviderConfig = {
+  async isGenerating(page: Page) {
+    const indicators = [
+      'button[aria-label="Stop"]',
+      'button[aria-label="Stop generating"]',
+      'button[aria-label="Cancel"]',
+      'button:has-text("Stop")',
+      '.generating',
+      '.loading',
+      '.spinner',
+      '[class*="generating"]',
+      '[class*="loading"]',
+      '[class*="spinner"]',
+    ];
+    for (const sel of indicators) {
+      const visible = await page
+        .locator(sel)
+        .first()
+        .isVisible()
+        .catch(() => false);
+      if (visible) return true;
+    }
+
+    const lastTurn = page.locator('.message-bubble, .response-content-markdown').last();
+    const text = (await lastTurn.textContent().catch(() => ''))?.toLowerCase() ?? '';
+    return (
+      text.includes('generating image') ||
+      text.includes('creating image') ||
+      text.includes('drawing') ||
+      text.includes('rendering')
+    );
+  },
+
+  async extractImages(page: Page) {
+    return page.evaluate(() => {
+      const seen = new Set<string>();
+      const results: { url: string; alt: string; width: number; height: number }[] = [];
+      const selectors = [
+        'img[src*="assets.grok.com"][src*="/generated/"]',
+        'img[src*="assets.grok.com"]',
+        'img[alt*="Generated" i]',
+        'img[alt*="Grok" i]',
+      ];
+      const imgs = Array.from(document.querySelectorAll(selectors.join(', ')));
+      for (const img of imgs) {
+        const src = img.getAttribute('src') ?? '';
+        if (!src || seen.has(src)) continue;
+        const w = (img as HTMLImageElement).naturalWidth;
+        const h = (img as HTMLImageElement).naturalHeight;
+        if (w > 0 && w < 128 && h > 0 && h < 128) continue;
+        seen.add(src);
+        results.push({
+          url: src,
+          alt: img.getAttribute('alt') ?? '',
+          width: w,
+          height: h,
+        });
+      }
+      return results;
+    });
+  },
+
+  async extractText(page: Page) {
+    const lastTurn = page.locator('.message-bubble, .response-content-markdown').last();
+    return (await lastTurn.textContent().catch(() => ''))?.trim() ?? '';
+  },
+};
+
 const IMAGE_GEN_CONFIGS: Partial<Record<ProviderName, ImageGenProviderConfig>> = {
   chatgpt: chatgptImageGen,
   gemini: geminiImageGen,
+  grok: grokImageGen,
 };
+
+function getImageKey(image: GeneratedImage): string {
+  const url = image.url ?? '';
+  const idMatch = url.match(/[?&]id=([^&]+)/);
+  return idMatch?.[1] ?? url;
+}
 
 /**
  * Run image generation:
@@ -160,7 +235,7 @@ export async function runImageGen(options: ImageGenOptions): Promise<ImageGenRes
 
   if (!imageGenConfig) {
     throw new Error(
-      `Provider "${providerName}" does not support image generation. Use: chatgpt, gemini`,
+      `Provider "${providerName}" does not support image generation. Use: chatgpt, gemini, grok`,
     );
   }
 
@@ -200,40 +275,61 @@ export async function runImageGen(options: ImageGenOptions): Promise<ImageGenRes
       );
     }
 
+    // Snapshot images already present in the chat so old/generated history does not
+    // get reported as output for this run.
+    const existingImageKeys = new Set(
+      (await imageGenConfig.extractImages(browser.page)).map((image) => getImageKey(image)),
+    );
+    const filterNewImages = (candidates: GeneratedImage[]) =>
+      candidates.filter((image) => !existingImageKeys.has(getImageKey(image)));
+
     // Submit the image generation prompt
     console.log(chalk.dim('Submitting image prompt...'));
     await provider.actions.submitPrompt(browser.page, options.prompt);
 
-    // Poll for image generation with progress updates
+    // Poll for image generation with progress updates. Some providers briefly report
+    // no visible spinner while the image tool is still booting, so do not exit early
+    // until either an image appears or a minimum grace period has elapsed.
     console.log(chalk.dim('Generating image(s)...\n'));
     const pollInterval = 3_000;
+    const minimumWaitMs = Math.min(60_000, Math.max(15_000, Math.floor(timeoutMs / 3)));
     let lastLogTime = Date.now();
+    let images: GeneratedImage[] = [];
 
     while (Date.now() - startTime < timeoutMs) {
+      const elapsedMs = Date.now() - startTime;
       const generating = await imageGenConfig.isGenerating(browser.page);
+      images = filterNewImages(await imageGenConfig.extractImages(browser.page));
 
       // Log periodic progress
       if (Date.now() - lastLogTime > 10_000) {
-        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        const elapsed = Math.round(elapsedMs / 1000);
         console.log(chalk.dim(`  [${elapsed}s] Still generating...`));
         lastLogTime = Date.now();
       }
 
-      if (!generating) {
-        // Double-check: wait one more interval to be sure
+      if (images.length > 0 && !generating) {
+        // Double-check: wait one more interval to allow lazy-loaded image URLs to settle.
         await browser.page.waitForTimeout(pollInterval);
+        images = filterNewImages(await imageGenConfig.extractImages(browser.page));
         const stillGenerating = await imageGenConfig.isGenerating(browser.page);
         if (!stillGenerating) break;
+      }
+
+      if (!generating && images.length === 0 && elapsedMs >= minimumWaitMs) {
+        // Double-check before accepting a text-only/no-image outcome.
+        await browser.page.waitForTimeout(pollInterval);
+        images = filterNewImages(await imageGenConfig.extractImages(browser.page));
+        const stillGenerating = await imageGenConfig.isGenerating(browser.page);
+        if (!stillGenerating && images.length === 0) break;
       }
 
       await browser.page.waitForTimeout(pollInterval);
     }
 
-    // Wait for images to fully load
+    // Wait for images to fully load, then extract one final time.
     await browser.page.waitForTimeout(2_000);
-
-    // Extract images
-    const images = await imageGenConfig.extractImages(browser.page);
+    images = filterNewImages(await imageGenConfig.extractImages(browser.page));
     const text = await imageGenConfig.extractText(browser.page);
 
     console.log(chalk.green(`\n✓ Found ${images.length} image(s)`));

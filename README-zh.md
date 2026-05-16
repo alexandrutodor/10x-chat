@@ -190,10 +190,10 @@ npx 10x-chat@latest skill install
 
 | 提供者 | 狀態 | 模型 | 網址 |
 |--------|------|------|------|
-| ChatGPT | ✅ | — | chatgpt.com |
-| Gemini | ✅ | Fast、**Thinking**（預設）、Deep Think、Pro | gemini.google.com |
-| Claude | ✅ | — | claude.ai |
-| Grok | ✅ | — | grok.com |
+| ChatGPT | ✅ 對話 + 圖片 | — | chatgpt.com |
+| Gemini | ✅ 對話 + 圖片 | Fast、**Thinking**（預設）、Deep Think、Pro | gemini.google.com |
+| Claude | ✅ 對話 | — | claude.ai |
+| Grok | ✅ 對話 + 圖片 | — | grok.com |
 | Perplexity | ✅ | — | perplexity.ai |
 | NotebookLM | ✅ | — | notebooklm.google.com |
 

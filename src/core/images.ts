@@ -31,18 +31,43 @@ export async function downloadImages(
       let buf: Buffer;
       let contentType = '';
 
-      // Try Node fetch with cookies first
-      const resp = await fetch(url, {
-        headers: cookieHeader ? { cookie: cookieHeader } : undefined,
-      }).catch(() => null);
+      // Blob URLs are page-local; Node cannot fetch them. Read the rendered image
+      // from the browser page and serialize it through a canvas instead.
+      const resp = url.startsWith('blob:')
+        ? null
+        : await fetch(url, {
+            headers: cookieHeader ? { cookie: cookieHeader } : undefined,
+          }).catch(() => null);
 
       if (resp?.ok) {
         buf = Buffer.from(await resp.arrayBuffer());
         contentType = resp.headers.get('content-type') ?? '';
       } else {
-        // Fallback: fetch via browser context (handles auth cookies + CORS)
+        // Fallback: fetch via browser context (handles auth cookies + CORS), or
+        // draw blob-backed images to canvas when fetch(blob:) is unavailable.
         const dataUrl = await page.evaluate(async (imgUrl: string) => {
           try {
+            if (imgUrl.startsWith('blob:')) {
+              const img = Array.from(document.images).find((candidate) => {
+                const current =
+                  candidate.currentSrc || candidate.src || candidate.getAttribute('src');
+                return current === imgUrl;
+              });
+              if (
+                img instanceof HTMLImageElement &&
+                img.naturalWidth > 0 &&
+                img.naturalHeight > 0
+              ) {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return null;
+                ctx.drawImage(img, 0, 0);
+                return canvas.toDataURL('image/png');
+              }
+            }
+
             const r = await fetch(imgUrl, { credentials: 'include' });
             if (!r.ok) return null;
             const blob = await r.blob();

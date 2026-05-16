@@ -394,6 +394,11 @@ export const chatgptActions: ProviderActions = {
       await dismissOverlays(page);
 
       const composerVisible = await page.evaluate((sel: string) => {
+        const bodyText = document.body?.innerText ?? '';
+        if (/welcome back/i.test(bodyText) && /choose an account to continue/i.test(bodyText)) {
+          return false;
+        }
+
         const els = document.querySelectorAll(sel);
         for (let i = 0; i < els.length; i++) {
           const el = els[i];
