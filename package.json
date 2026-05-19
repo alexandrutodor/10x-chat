@@ -1,6 +1,6 @@
 {
   "name": "10x-chat",
-  "version": "0.10.13",
+  "version": "0.10.14",
   "description": "CLI to chat with web AI agents (ChatGPT, Gemini, Claude) via browser automation",
   "type": "module",
   "main": "dist/index.js",
@@ -62,8 +62,8 @@
     "commander": "^14.0.0",
     "fast-glob": "^3.3.3",
     "json5": "^2.2.3",
-    "patchright": "^1.58.0",
-    "playwright": "^1.52.0"
+    "patchright": "^1.59.4",
+    "playwright": "^1.58.2"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.0.0",
