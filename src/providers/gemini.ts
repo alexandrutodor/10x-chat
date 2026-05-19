@@ -13,8 +13,8 @@ export const GEMINI_CONFIG: ProviderConfig = {
   displayName: 'Gemini',
   url: 'https://gemini.google.com/app',
   loginUrl: 'https://gemini.google.com/app',
-  models: ['Fast', 'Thinking', 'Deep Think', 'Pro'],
-  defaultModel: 'Thinking',
+  models: ['3.1 Flash-Lite', '3.5 Flash', '3.1 Pro', 'Deep Think', 'Pro'],
+  defaultModel: '3.5 Flash',
   defaultTimeoutMs: 5 * 60 * 1000,
 };
 
@@ -25,22 +25,35 @@ function normalizeGeminiModeLabel(label: string): string {
     .trim();
 }
 
+function resolveGeminiModeLabel(model: string): string {
+  const normalized = normalizeGeminiModeLabel(model);
+  if (normalized === 'fast') return '3.1 Flash-Lite';
+  if (normalized === 'thinking') return '3.5 Flash';
+  if (normalized === 'pro') return '3.1 Pro';
+  return model;
+}
+
 function geminiModeTestId(model: string): string {
-  const slug = normalizeGeminiModeLabel(model).replace(/\s+/g, '-');
+  const slug = normalizeGeminiModeLabel(resolveGeminiModeLabel(model)).replace(/\s+/g, '-');
   return `bard-mode-option-${slug}`;
 }
 
 async function clickGeminiMenuOption(page: Page, label: string): Promise<boolean> {
   const target = normalizeGeminiModeLabel(label);
   return page.evaluate((targetLabel: string) => {
-    const overlay = document.querySelector('.cdk-overlay-container');
-    if (!overlay) return false;
+    const overlay = document.querySelector('.cdk-overlay-container') ?? document.body;
 
-    const candidates = Array.from(
-      overlay.querySelectorAll(
-        'button,[role="menuitem"],[role="menuitemcheckbox"],[role="option"],mat-option',
-      ),
-    ) as HTMLElement[];
+    const candidates = (
+      Array.from(
+        overlay.querySelectorAll(
+          'button,[role="menuitem"],[role="menuitemcheckbox"],[role="option"],mat-option,gem-menu-item,toolbox-drawer-item',
+        ),
+      ) as HTMLElement[]
+    ).sort((a, b) => {
+      const aInteractive = a.tagName === 'BUTTON' || !!a.getAttribute('role');
+      const bInteractive = b.tagName === 'BUTTON' || !!b.getAttribute('role');
+      return Number(bInteractive) - Number(aInteractive);
+    });
     for (const el of candidates) {
       const visible = el.offsetWidth > 0 && el.offsetHeight > 0;
       if (!visible) continue;
@@ -52,7 +65,13 @@ async function clickGeminiMenuOption(page: Page, label: string): Promise<boolean
         normalized.startsWith(`${targetLabel} `) ||
         normalized.includes(targetLabel)
       ) {
-        el.click();
+        const clickTarget =
+          el.tagName === 'BUTTON' || el.getAttribute('role')
+            ? el
+            : ((el.querySelector(
+                'button,[role="menuitem"],[role="menuitemcheckbox"]',
+              ) as HTMLElement | null) ?? el);
+        clickTarget.click();
         return true;
       }
     }
@@ -275,17 +294,19 @@ async function waitForImages(page: Page, timeoutMs: number): Promise<void> {
 
 export const geminiActions: ProviderActions = {
   async selectModel(page: Page, model: string): Promise<void> {
+    const targetModel = resolveGeminiModeLabel(model);
+
     // Gemini Ultra exposes Deep Think as a Tools menu checkbox, not as a normal mode.
-    if (normalizeGeminiModeLabel(model) === 'deep think') {
+    if (normalizeGeminiModeLabel(targetModel) === 'deep think') {
       await page
         .locator(SELECTORS.composer)
         .first()
         .waitFor({ state: 'visible', timeout: 10_000 })
         .catch(() => {});
       await page.waitForTimeout(1_500);
-      const toolActivated = await activateGeminiTool(page, model);
+      const toolActivated = await activateGeminiTool(page, targetModel);
       if (!toolActivated) {
-        console.warn(`Gemini tool "${model}" was not available — using current mode`);
+        console.warn(`Gemini tool "${targetModel}" was not available — using current mode`);
       }
       return;
     }
@@ -298,25 +319,38 @@ export const geminiActions: ProviderActions = {
     }, SELECTORS.modelPicker);
 
     if (!pickerState.found) {
-      const toolActivated = await activateGeminiTool(page, model);
+      const toolActivated = await activateGeminiTool(page, targetModel);
       if (!toolActivated) {
         console.warn(
-          `Gemini mode picker not found and tool "${model}" was not available — using current mode`,
+          `Gemini mode picker not found and tool "${targetModel}" was not available — using current mode`,
         );
       }
       return;
     }
 
-    if (normalizeGeminiModeLabel(pickerState.text) === normalizeGeminiModeLabel(model)) {
+    if (normalizeGeminiModeLabel(pickerState.text) === normalizeGeminiModeLabel(targetModel)) {
       return; // Already on the requested mode
     }
 
-    // Open the mode picker menu (Playwright click for React event dispatch)
-    await page.locator(SELECTORS.modelPicker).first().click();
+    // Open the mode picker menu. Prefer a DOM click against the currently visible
+    // button because Gemini's new UI can keep stale hidden picker buttons in the DOM.
+    const pickerClicked = await page.evaluate((sel: string) => {
+      const candidates = Array.from(document.querySelectorAll(sel)) as HTMLElement[];
+      const btn = candidates.find((el) => el.offsetWidth > 0 && el.offsetHeight > 0);
+      if (btn) {
+        btn.click();
+        return true;
+      }
+      return false;
+    }, SELECTORS.modelPicker);
+    if (!pickerClicked) {
+      await page.locator(SELECTORS.modelPicker).first().click();
+    }
     await page.waitForTimeout(1000);
 
-    // Select by data-test-id (e.g. "Thinking" → "bard-mode-option-thinking")
-    const testId = geminiModeTestId(model);
+    // Legacy Gemini menus used readable data-test-ids. Current menus use opaque ids,
+    // so text selection below is the primary path and this remains a harmless fast path.
+    const testId = geminiModeTestId(targetModel);
     const clicked = await page.evaluate((tid: string) => {
       const btn = document.querySelector(`button[data-test-id="${tid}"]`);
       if (btn instanceof HTMLElement && btn.offsetWidth > 0) {
@@ -326,17 +360,25 @@ export const geminiActions: ProviderActions = {
       return false;
     }, testId);
 
-    const textClicked = clicked || (await clickGeminiMenuOption(page, model));
+    const playwrightTextClicked =
+      clicked ||
+      (await page
+        .locator(`text=${targetModel}`)
+        .first()
+        .click({ timeout: 2_000 })
+        .then(() => true)
+        .catch(() => false));
+    const textClicked = playwrightTextClicked || (await clickGeminiMenuOption(page, targetModel));
 
     if (!textClicked) {
       const availableModes = await getVisibleGeminiMenuLabels(page);
       await page.keyboard.press('Escape').catch(() => {});
       await page.waitForTimeout(700);
 
-      const toolActivated = await activateGeminiTool(page, model);
+      const toolActivated = await activateGeminiTool(page, targetModel);
       if (!toolActivated) {
         console.warn(
-          `Mode/tool "${model}" not found in Gemini${availableModes ? ` (mode picker: ${availableModes})` : ''} — using current mode`,
+          `Mode/tool "${targetModel}" not found in Gemini${availableModes ? ` (mode picker: ${availableModes})` : ''} — using current mode`,
         );
       }
       return;
@@ -369,7 +411,16 @@ export const geminiActions: ProviderActions = {
         // because the signed-in UI can still contain "Sign in" links in footer/help areas.
         const signedInIndicators = Array.from(
           document.querySelectorAll(
-            'button[aria-label*="profile" i], button[aria-label*="account" i], [data-test-id*="account" i], [data-test-id*="profile" i], img[alt*="profile" i], img[alt*="account" i]',
+            [
+              'button[aria-label*="profile" i]',
+              'button[aria-label*="account" i]',
+              '[aria-label*="Google Account" i]',
+              '[data-test-id*="account" i]',
+              '[data-test-id*="profile" i]',
+              'img[alt*="profile" i]',
+              'img[alt*="account" i]',
+              'a[href*="SignOutOptions"]',
+            ].join(','),
           ),
         ).filter(visible);
         const bodyText = document.body.textContent ?? '';
@@ -385,10 +436,13 @@ export const geminiActions: ProviderActions = {
         ).filter(visible) as HTMLElement[];
         const signInVisible = candidates.some((el) => {
           const text = (el.textContent ?? '').trim();
+          const aria = el.getAttribute('aria-label') ?? '';
           const testId = el.getAttribute('data-test-id') ?? '';
           const href = el instanceof HTMLAnchorElement ? el.href : '';
+          if (/SignOutOptions/i.test(href) || /Google Account/i.test(aria)) return false;
           return (
             /sign in/i.test(text) ||
+            /sign in/i.test(aria) ||
             testId === 'bard-sign-in-button' ||
             href.includes('accounts.google.com')
           );

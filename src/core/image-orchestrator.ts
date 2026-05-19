@@ -283,6 +283,19 @@ export async function runImageGen(options: ImageGenOptions): Promise<ImageGenRes
     const filterNewImages = (candidates: GeneratedImage[]) =>
       candidates.filter((image) => !existingImageKeys.has(getImageKey(image)));
 
+    // Gemini's 2026 UI moved image generation behind Upload & tools → Create image.
+    // Plain image prompts now often produce text-only acknowledgements, so explicitly
+    // activate the image tool before submitting.
+    if (providerName === 'gemini') {
+      const { activateGeminiTool } = await import('../providers/gemini.js');
+      const imageToolActivated = await activateGeminiTool(browser.page, 'Create image');
+      if (!imageToolActivated) {
+        console.warn(
+          chalk.yellow('Gemini Create image tool was not available — submitting prompt directly'),
+        );
+      }
+    }
+
     // Submit the image generation prompt
     console.log(chalk.dim('Submitting image prompt...'));
     await provider.actions.submitPrompt(browser.page, options.prompt);
