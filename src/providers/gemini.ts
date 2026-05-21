@@ -388,6 +388,9 @@ export const geminiActions: ProviderActions = {
 
   async isLoggedIn(page: Page): Promise<boolean> {
     try {
+      const currentUrl = page.url();
+      if (/accounts\.google\.com/i.test(currentUrl)) return false;
+
       await page
         .locator(SELECTORS.composer)
         .first()
@@ -400,38 +403,66 @@ export const geminiActions: ProviderActions = {
         .catch(() => false);
       if (!composerVisible) return false;
 
+      const googleAuthCookieNames = new Set([
+        'SID',
+        'HSID',
+        'SSID',
+        'APISID',
+        'SAPISID',
+        'LSID',
+        '__Secure-1PSID',
+        '__Secure-3PSID',
+        '__Secure-1PSIDTS',
+        '__Secure-3PSIDTS',
+      ]);
+      const hasGoogleAuthCookies = await page
+        .context()
+        .cookies([
+          'https://accounts.google.com',
+          'https://gemini.google.com',
+          'https://www.google.com',
+        ])
+        .then((cookies) => cookies.some((cookie) => googleAuthCookieNames.has(cookie.name)))
+        .catch(() => false);
+
       const authState = await page.evaluate(() => {
         const visible = (el: Element): boolean => {
           if (!(el instanceof HTMLElement)) return false;
-          return el.offsetWidth > 0 && el.offsetHeight > 0;
+          const style = window.getComputedStyle(el);
+          return (
+            el.offsetWidth > 0 &&
+            el.offsetHeight > 0 &&
+            style.visibility !== 'hidden' &&
+            style.display !== 'none'
+          );
         };
 
-        // Gemini signed-in accounts show an account/profile button and paid-plan badges
-        // (e.g. ULTRA). Prefer positive signed-in evidence over generic Sign in text,
-        // because the signed-in UI can still contain "Sign in" links in footer/help areas.
+        // Gemini can expose a usable composer to signed-out/guest users. Treat the state
+        // as authenticated only when we see positive account evidence, not merely because
+        // the composer exists or because the page mentions paid plan names like Pro/Ultra.
         const signedInIndicators = Array.from(
           document.querySelectorAll(
             [
-              'button[aria-label*="profile" i]',
-              'button[aria-label*="account" i]',
               '[aria-label*="Google Account" i]',
+              '[aria-label*="account menu" i]',
+              '[aria-label*="profile" i]',
+              'button[aria-label*="account" i]',
               '[data-test-id*="account" i]',
               '[data-test-id*="profile" i]',
               'img[alt*="profile" i]',
               'img[alt*="account" i]',
               'a[href*="SignOutOptions"]',
+              'a[href*="Logout"]',
             ].join(','),
           ),
         ).filter(visible);
-        const bodyText = document.body.textContent ?? '';
-        const hasPaidBadge = /\b(ultra|pro)\b/i.test(bodyText);
-        if (signedInIndicators.length > 0 || hasPaidBadge) {
+        if (signedInIndicators.length > 0) {
           return { signedIn: true, signInVisible: false };
         }
 
         const candidates = Array.from(
           document.querySelectorAll(
-            '.sign-in-button, button[data-test-id="bard-sign-in-button"], a[href*="accounts.google.com"], button',
+            '.sign-in-button, button[data-test-id="bard-sign-in-button"], a[href*="accounts.google.com"], button, a',
           ),
         ).filter(visible) as HTMLElement[];
         const signInVisible = candidates.some((el) => {
@@ -439,20 +470,29 @@ export const geminiActions: ProviderActions = {
           const aria = el.getAttribute('aria-label') ?? '';
           const testId = el.getAttribute('data-test-id') ?? '';
           const href = el instanceof HTMLAnchorElement ? el.href : '';
-          if (/SignOutOptions/i.test(href) || /Google Account/i.test(aria)) return false;
+          if (/SignOutOptions|Logout/i.test(href) || /Google Account/i.test(aria)) return false;
           return (
-            /sign in/i.test(text) ||
-            /sign in/i.test(aria) ||
+            /^sign in$/i.test(text) ||
+            /\bsign in\b/i.test(aria) ||
             testId === 'bard-sign-in-button' ||
-            href.includes('accounts.google.com')
+            /accounts\.google\.com/i.test(href)
           );
         });
-        return { signedIn: false, signInVisible };
+
+        const bodyText = (document.body.textContent ?? '').replace(/\s+/g, ' ');
+        const signedOutPromptVisible =
+          /sign in to (?:gemini|continue|save|access|use)/i.test(bodyText) ||
+          /try gemini without signing in/i.test(bodyText);
+
+        return { signedIn: false, signInVisible: signInVisible || signedOutPromptVisible };
       });
 
       if (authState.signedIn) return true;
       if (authState.signInVisible) return false;
-      return true;
+
+      // If Gemini has hidden the avatar/menu in this viewport, fall back to the presence
+      // of Google auth cookies. Without these cookies, a visible composer is only guest mode.
+      return hasGoogleAuthCookies;
     } catch {
       return false;
     }
