@@ -6,7 +6,7 @@
 
 | Path | What |
 |------|------|
-| `src/providers/` | One file per AI provider (chatgpt, gemini, claude, grok, perplexity, notebooklm, flow) |
+| `src/providers/` | One file per AI provider (chatgpt, gemini, claude, grok, perplexity, notebooklm, flow, dreamina) |
 | `src/providers/registry.ts` | Provider name → config + actions mapping |
 | `src/providers/submit.ts` | Shared prompt submission helper (composer → type → send) |
 | `src/core/orchestrator.ts` | Single + parallel chat execution (`runChat`, `runChatAll`) |
@@ -55,6 +55,18 @@ Provider actions implement:
 - **Tab ref-counting**: Multiple CLI invocations share one Chromium; last tab stops the daemon
 - **Force-click**: Some providers need `click({ force: true })` to bypass overlay interception
 - **Model selection**: Orchestrator calls `selectModel()` before `submitPrompt()` if the provider implements it. Model resolved from `--model` flag → `provider.config.defaultModel`. Gemini supports modes: Fast, Thinking (default), Pro
+
+## Video Generation
+
+`10x-chat video --provider <flow|dreamina>` (default `flow`).
+
+- **Flow (Veo)**: `--model`, `--mode ingredients|frames`, `--orientation`, `--count`, `--start-frame`, `--end-frame`. Orchestrator: `core/video-orchestrator.ts` + `providers/flow.ts`.
+- **Dreamina (Seedance)**: `--model` (Seedance 2.0 Fast = cheapest/default · 2.0 · 1.5 Pro · 1.0 · 1.0 Fast), `--aspect` (21:9…9:16), `--resolution` (720P/1080P; model-dependent), `--duration` (4-15s), `--ref-mode omni|frames|multiframes`, `--image <path>` (repeatable, ≤12, image-to-video). Orchestrator: `core/dreamina-video-orchestrator.ts` + `providers/dreamina-video.ts`.
+  - **Model availability is account/plan-dependent.** Seedance 2.0 Fast + 2.0 are generally available; 1.5 Pro / 1.0 / 1.0 Fast are often locked (rendered `lv-select-option-wrapper-disabled`). `selectVideoModel` throws a clear error for a locked model rather than silently using the wrong one.
+  - **Aspect-button gotcha**: models that expose a resolution render the combined control as `"16:9720P"` (ratio+res run together); discovery must match the ratio with NO trailing `\b` (see `buttonTextHasAspectRatio`).
+  - Runs on a **shared persistent** context (not the daemon) — the helpers need full-page `evaluateHandle`/`keyboard.insertText`.
+  - Generate navigates to `/ai-tool/generate`; the result is matched by **prompt text scoped to its `responsive-video-grid` record** (avoids trending-feed / other-generation videos), then downloaded via `core/video-download.ts`.
+  - **Placeholder gotcha**: while generating, the result card embeds a 780×780 loading-spinner `<video>` from `capcutstatic.com/.../capcut-web-login-static`. The finished clip is a real CDN video whose path contains `/video/`. `isDreaminaResultSrc()` rejects the placeholder so the poll waits for the actual clip instead of downloading the spinner. The poll also strips composer/editable text from a record (so the composer's echo of our prompt can't false-match) and excludes any `<video>` src present before generate (baseline).
 
 ## Pre-Commit Checklist
 

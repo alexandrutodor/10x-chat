@@ -11,7 +11,8 @@ describe('Provider Registry', () => {
     expect(providers).toContain('perplexity');
     expect(providers).toContain('notebooklm');
     expect(providers).toContain('flow');
-    expect(providers).toHaveLength(7);
+    expect(providers).toContain('dreamina');
+    expect(providers).toHaveLength(8);
   });
 
   it('should get a provider by name', () => {
@@ -37,6 +38,14 @@ describe('Provider Registry', () => {
     expect(provider.actions).toBeDefined();
   });
 
+  it('should get dreamina provider by name', () => {
+    const provider = getProvider('dreamina');
+    expect(provider.config.name).toBe('dreamina');
+    expect(provider.config.displayName).toBe('Dreamina');
+    expect(provider.config.url).toContain('dreamina.capcut.com');
+    expect(provider.actions).toBeDefined();
+  });
+
   it('should validate provider names', () => {
     expect(isValidProvider('chatgpt')).toBe(true);
     expect(isValidProvider('gemini')).toBe(true);
@@ -45,6 +54,7 @@ describe('Provider Registry', () => {
     expect(isValidProvider('perplexity')).toBe(true);
     expect(isValidProvider('notebooklm')).toBe(true);
     expect(isValidProvider('flow')).toBe(true);
+    expect(isValidProvider('dreamina')).toBe(true);
     expect(isValidProvider('unknown')).toBe(false);
     expect(isValidProvider('')).toBe(false);
     // Prototype pollution guard

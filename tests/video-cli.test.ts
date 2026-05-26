@@ -56,4 +56,22 @@ describe('Video CLI Command', () => {
     const isoOpt = cmd.options.find((o) => o.long === '--isolated-profile');
     expect(isoOpt).toBeDefined();
   });
+
+  it('should have a provider option defaulting to flow', () => {
+    const providerOpt = cmd.options.find((o) => o.long === '--provider');
+    expect(providerOpt).toBeDefined();
+    expect(providerOpt?.defaultValue).toBe('flow');
+  });
+
+  it('should have Dreamina-specific options', () => {
+    for (const long of ['--aspect', '--resolution', '--duration', '--ref-mode', '--image']) {
+      expect(cmd.options.find((o) => o.long === long)).toBeDefined();
+    }
+  });
+
+  it('should collect repeatable --image into an array (default empty)', () => {
+    const imageOpt = cmd.options.find((o) => o.long === '--image');
+    expect(imageOpt).toBeDefined();
+    expect(imageOpt?.defaultValue).toEqual([]);
+  });
 });

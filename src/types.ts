@@ -19,7 +19,8 @@ export type ProviderName =
   | 'grok'
   | 'perplexity'
   | 'notebooklm'
-  | 'flow';
+  | 'flow'
+  | 'dreamina';
 
 export interface ProviderConfig {
   name: ProviderName;
