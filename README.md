@@ -45,8 +45,11 @@ npx 10x-chat@latest login claude         # Login to Claude
 npx 10x-chat@latest login grok           # Login to Grok
 npx 10x-chat@latest login perplexity     # Login to Perplexity
 npx 10x-chat@latest login notebooklm     # Login to NotebookLM
+npx 10x-chat@latest login dreamina       # Login to Dreamina (CapCut) for video
 npx 10x-chat@latest login --status       # Check login status for all providers
 ```
+
+> Google Flow (Veo) video uses your Google login — logging into Gemini covers it in shared-profile mode.
 
 ### `chat`
 
@@ -109,6 +112,51 @@ npx 10x-chat@latest research -p "Compare React vs Vue in 2026" --provider perple
 | `--timeout <ms>` | Total timeout (default: 600000 / 10 min) |
 | `--poll-interval <ms>` | Progress check interval (default: 5000) |
 | `--save-dir <dir>` | Directory to save the research report |
+
+### `video`
+
+Generate video via browser automation — **Google Flow** (Veo) or **Dreamina** (Seedance).
+
+```bash
+# Google Flow / Veo (default) — uses your Google login (shared with Gemini)
+npx 10x-chat@latest video -p "A drone shot over snowy mountains at sunrise" --provider flow
+npx 10x-chat@latest video -p "Neon city street, rain" --provider flow --model "Veo 3.1 - Quality" --orientation portrait
+
+# Dreamina / Seedance (CapCut)
+npx 10x-chat@latest login dreamina   # one-time CapCut login
+npx 10x-chat@latest video -p "A paper boat in a rain gutter, macro" --provider dreamina --aspect 9:16 --duration 4
+npx 10x-chat@latest video -p "The glowing orb pulses and floats up" --provider dreamina --image ref.png --ref-mode omni
+```
+
+Shared flags:
+
+| Flag | Description |
+|------|-------------|
+| `-p, --prompt <text>` | **(required)** The video generation prompt |
+| `--provider <name>` | `flow` (default) or `dreamina` |
+| `--model <name>` | Model (provider-specific — see below) |
+| `--headed` | Show browser window during generation |
+| `--timeout <ms>` | Generation timeout (default: 600000 / 10 min) |
+| `--save-dir <dir>` | Directory to save generated videos |
+
+**Flow (Veo)** — models: `Veo 3.1 - Fast` (default), `Veo 3.1 - Fast [Lower Priority]`, `Veo 3.1 - Quality`, `Veo 2 - Fast`, `Veo 2 - Quality`.
+
+| Flag | Description |
+|------|-------------|
+| `--mode <mode>` | `ingredients` (default) or `frames` |
+| `--orientation <dir>` | `landscape` (default) or `portrait` |
+| `--count <n>` | Simultaneous generations (1-4) |
+| `--start-frame <path>` / `--end-frame <path>` | Keyframe images (frames mode) |
+
+**Dreamina (Seedance)** — requires `login dreamina` (CapCut account). Models: `Seedance 2.0 Fast` (default, cheapest), `Seedance 2.0`; `Seedance 1.5 Pro` / `1.0` / `1.0 Fast` may be locked depending on your plan/region.
+
+| Flag | Description |
+|------|-------------|
+| `--aspect <ratio>` | `21:9`, `16:9`, `4:3`, `1:1`, `3:4`, `9:16` |
+| `--resolution <res>` | `720P` (default) or `1080P` (model-dependent) |
+| `--duration <secs>` | Clip length in seconds (4-15) |
+| `--ref-mode <mode>` | Input-image mode: `omni` (default), `frames`, `multiframes` |
+| `--image <path>` | Reference/input image for image-to-video (repeatable, up to 12) |
 
 ### `history`
 
@@ -231,6 +279,8 @@ This lets agents like Codex or Claude Code use 10x-chat to query other models fo
 | Grok | ✅ chat + image | — | grok.com |
 | Perplexity | ✅ | — | perplexity.ai |
 | NotebookLM | ✅ | — | notebooklm.google.com |
+| Google Flow | ✅ video (Veo) | Veo 3.1 Fast/Quality, Veo 2 Fast/Quality | labs.google/fx/tools/flow |
+| Dreamina | ✅ video (Seedance) | Seedance 2.0 Fast/2.0 (1.x often plan-locked) | dreamina.capcut.com |
 
 ## Development
 
