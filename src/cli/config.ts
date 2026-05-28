@@ -35,10 +35,24 @@ export function createConfigCommand(): Command {
         case 'model':
           config.defaultModel = value;
           break;
-        case 'timeout':
-          config.defaultTimeoutMs = Number.parseInt(value, 10);
+        case 'timeout': {
+          const timeoutMs = Number.parseInt(value, 10);
+          if (Number.isNaN(timeoutMs) || timeoutMs <= 0) {
+            console.error(
+              chalk.red(`Invalid timeout: ${value} (expected a positive integer in ms)`),
+            );
+            process.exit(1);
+          }
+          config.defaultTimeoutMs = timeoutMs;
           break;
+        }
         case 'headless':
+          if (value !== 'true' && value !== 'false') {
+            console.error(
+              chalk.red(`Invalid headless value: ${value} (expected 'true' or 'false')`),
+            );
+            process.exit(1);
+          }
           config.headless = value === 'true';
           break;
         default:
