@@ -40,7 +40,9 @@ const program = new Command();
 
 program
   .name('10x-chat')
-  .description('Chat with web AI agents (ChatGPT, Gemini, Claude) via browser automation')
+  .description(
+    'Chat with web AI agents (ChatGPT, Gemini, Claude, Grok, Perplexity, NotebookLM) and generate video (Flow, Dreamina) via browser automation',
+  )
   .version(pkg.version);
 
 program.addCommand(createLoginCommand());
