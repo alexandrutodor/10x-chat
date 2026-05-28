@@ -9,6 +9,12 @@ export function createStatusCommand(): Command {
     .option('--hours <n>', 'Show sessions from last N hours', '24')
     .action(async (options) => {
       const hours = Number.parseInt(options.hours, 10);
+      if (Number.isNaN(hours) || hours <= 0) {
+        console.error(
+          chalk.red(`Invalid --hours value: ${options.hours} (expected a positive integer)`),
+        );
+        process.exit(1);
+      }
       const sessions = await listSessions({ hours });
 
       if (sessions.length === 0) {
