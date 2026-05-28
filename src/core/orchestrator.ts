@@ -187,9 +187,8 @@ export async function runChatAll(options: ChatOptions): Promise<ChatAllResult[]>
     }
   });
 
-  return Promise.allSettled(tasks).then((settled) =>
-    settled.map((s) =>
-      s.status === 'fulfilled' ? s.value : { provider: 'chatgpt', error: String(s.reason) },
-    ),
-  );
+  // Each task catches its own errors and resolves to a ChatAllResult, so it
+  // never rejects — Promise.all preserves per-provider error attribution
+  // (the previous Promise.allSettled fallback hard-coded provider: 'chatgpt').
+  return Promise.all(tasks);
 }
