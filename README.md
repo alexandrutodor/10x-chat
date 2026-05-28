@@ -231,6 +231,19 @@ npx 10x-chat@latest notebooklm summarize <notebookId>             # AI summary +
 npx 10x-chat@latest chat -p "Summarize key points" --provider notebooklm
 ```
 
+### `migrate`
+
+Merge older per-provider isolated browser profiles into the single shared
+profile used by default. Useful when upgrading from a version that stored a
+separate profile per provider.
+
+```bash
+npx 10x-chat@latest migrate --dry-run            # Preview without making changes
+npx 10x-chat@latest migrate                      # Auto-pick the largest profile as the base
+npx 10x-chat@latest migrate --source chatgpt     # Use a specific provider's profile as the base
+npx 10x-chat@latest migrate --keep               # Keep the old isolated profiles after migrating
+```
+
 ## File Bundling
 
 The `--file` flag accepts globs. Files are assembled into a markdown bundle sent as the prompt:
