@@ -45,6 +45,7 @@
     "playwright"
   ],
   "license": "MIT",
+  "author": "Mike Chong",
   "repository": {
     "type": "git",
     "url": "https://github.com/MikeChongCan/10x-chat.git"

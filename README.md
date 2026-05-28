@@ -304,6 +304,13 @@ git push --follow-tags
 
 Requires `NPM_TOKEN` secret in the GitHub repository settings.
 
+## Disclaimer
+
+This project is provided **for research and educational purposes only**. It
+automates web interfaces that may be subject to the terms of service of the
+respective providers. You are solely responsible for how you use it, including
+compliance with any applicable terms, and you use it at your own risk.
+
 ## License
 
-MIT
+MIT © Mike Chong — see [LICENSE](./LICENSE).
