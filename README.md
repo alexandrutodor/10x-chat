@@ -1,6 +1,6 @@
 # 10x-chat
 
-> Chat with web AI agents (ChatGPT, Gemini, Claude, Grok, Perplexity) from your terminal via browser automation.
+> Chat with web AI agents (ChatGPT, Gemini, Claude, Grok, Perplexity, NotebookLM) from your terminal via browser automation.
 
 **English** | [繁體中文](./README-zh.md)
 
