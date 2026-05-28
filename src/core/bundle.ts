@@ -23,6 +23,18 @@ const DEFAULT_EXCLUDES = [
 
 const MAX_FILE_SIZE = 1024 * 1024; // 1 MB
 
+/**
+ * Pick a code-fence length longer than the longest backtick run in the content,
+ * so files that themselves contain ``` fences (markdown, docs) don't break the
+ * surrounding fence. Per CommonMark, a fenced block ends only at a fence of the
+ * same or greater length, so we use (longest run + 1), with a minimum of 3.
+ */
+function fenceFor(content: string): string {
+  const runs = content.match(/`+/g);
+  const longest = runs ? Math.max(...runs.map((r) => r.length)) : 0;
+  return '`'.repeat(Math.max(3, longest + 1));
+}
+
 interface BundleOptions {
   prompt: string;
   files?: string[];
@@ -83,10 +95,11 @@ export async function buildBundle(opts: BundleOptions): Promise<string> {
     const ext = path.extname(filePath).slice(1) || 'txt';
     const relativePath = path.relative(cwd, filePath);
 
+    const fence = fenceFor(content);
     parts.push(`## ${relativePath}\n`);
-    parts.push(`\`\`\`${ext}`);
+    parts.push(`${fence}${ext}`);
     parts.push(content);
-    parts.push('```\n');
+    parts.push(`${fence}\n`);
   }
 
   return parts.join('\n');
