@@ -120,11 +120,12 @@ Generate video via browser automation — **Google Flow** (Veo) or **Dreamina** 
 ```bash
 # Google Flow / Veo (default) — uses your Google login (shared with Gemini)
 npx 10x-chat@latest video -p "A drone shot over snowy mountains at sunrise" --provider flow
-npx 10x-chat@latest video -p "Neon city street, rain" --provider flow --model "Veo 3.1 - Quality" --orientation portrait
+npx 10x-chat@latest video -p "Neon city street, rain" --provider flow --model "Omni Flash" --duration 10 --orientation portrait
+npx 10x-chat@latest video -p "Cinematic timelapse, golden hour" --provider flow --model "Veo 3.1 - Quality" --duration 8
 
 # Dreamina / Seedance (CapCut)
 npx 10x-chat@latest login dreamina   # one-time CapCut login
-npx 10x-chat@latest video -p "A paper boat in a rain gutter, macro" --provider dreamina --aspect 9:16 --duration 4
+npx 10x-chat@latest video -p "A paper boat in a rain gutter, macro" --provider dreamina --aspect 9:16 --dreamina-duration 4
 npx 10x-chat@latest video -p "The glowing orb pulses and floats up" --provider dreamina --image ref.png --ref-mode omni
 ```
 
@@ -139,13 +140,14 @@ Shared flags:
 | `--timeout <ms>` | Generation timeout (default: 600000 / 10 min) |
 | `--save-dir <dir>` | Directory to save generated videos |
 
-**Flow (Veo)** — models: `Veo 3.1 - Fast` (default), `Veo 3.1 - Fast [Lower Priority]`, `Veo 3.1 - Quality`, `Veo 2 - Fast`, `Veo 2 - Quality`.
+**Flow (Veo)** — models: `Omni Flash` (default), `Veo 3.1 - Lite`, `Veo 3.1 - Fast`, `Veo 3.1 - Quality`.
 
 | Flag | Description |
 |------|-------------|
 | `--mode <mode>` | `ingredients` (default) or `frames` |
 | `--orientation <dir>` | `landscape` (default) or `portrait` |
 | `--count <n>` | Simultaneous generations (1-4) |
+| `--duration <secs>` | Clip length in seconds: `4`, `6`, `8`, `10` |
 | `--start-frame <path>` / `--end-frame <path>` | Keyframe images (frames mode) |
 
 **Dreamina (Seedance)** — requires `login dreamina` (CapCut account). Models: `Seedance 2.0 Fast` (default, cheapest), `Seedance 2.0`; `Seedance 1.5 Pro` / `1.0` / `1.0 Fast` may be locked depending on your plan/region.
@@ -154,7 +156,7 @@ Shared flags:
 |------|-------------|
 | `--aspect <ratio>` | `21:9`, `16:9`, `4:3`, `1:1`, `3:4`, `9:16` |
 | `--resolution <res>` | `720P` (default) or `1080P` (model-dependent) |
-| `--duration <secs>` | Clip length in seconds (4-15) |
+| `--dreamina-duration <secs>` | Clip length in seconds (4-15) |
 | `--ref-mode <mode>` | Input-image mode: `omni` (default), `frames`, `multiframes` |
 | `--image <path>` | Reference/input image for image-to-video (repeatable, up to 12) |
 
@@ -292,7 +294,7 @@ This lets agents like Codex or Claude Code use 10x-chat to query other models fo
 | Grok | ✅ chat + image | — | grok.com |
 | Perplexity | ✅ | — | perplexity.ai |
 | NotebookLM | ✅ | — | notebooklm.google.com |
-| Google Flow | ✅ video (Veo) | Veo 3.1 Fast/Quality, Veo 2 Fast/Quality | labs.google/fx/tools/flow |
+| Google Flow | ✅ video (Veo) | **Omni Flash** (default), Veo 3.1 Lite/Fast/Quality | labs.google/fx/tools/flow |
 | Dreamina | ✅ video (Seedance) | Seedance 2.0 Fast/2.0 (1.x often plan-locked) | dreamina.capcut.com |
 
 ## Development

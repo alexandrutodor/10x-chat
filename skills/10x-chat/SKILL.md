@@ -47,7 +47,7 @@ Use `npx` (not `bunx` — symlink conflicts in parallel).
 | grok | ✅ | ✅ | ❌ | ❌ | — | UI changes often, use `@latest` |
 | perplexity | ✅ | ❌ | ✅ | ❌ | — | Best for research with citations |
 | notebooklm | ✅ | ❌ | ❌ | ❌ | — | Add sources first, then chat |
-| flow | ❌ | ❌ | ❌ | ✅ (Veo) | Veo 3.1 Fast/Quality, Veo 2 Fast/Quality | Google login (shared with Gemini) |
+| flow | ❌ | ❌ | ❌ | ✅ (Veo) | **Omni Flash** (default), Veo 3.1 Lite/Fast/Quality | Google login (shared with Gemini) |
 | dreamina | ❌ | ❌ | ❌ | ✅ (Seedance) | Seedance 2.0 Fast (default)/2.0; 1.x often plan-locked | `login dreamina` (CapCut); text + image-to-video |
 
 ## Commands
@@ -78,9 +78,10 @@ npx 10x-chat@latest research -p "Market analysis of EVs" --provider chatgpt --ti
 
 # Video generation (Flow / Veo default, or Dreamina / Seedance)
 npx 10x-chat@latest video -p "Drone shot over snowy peaks at sunrise" --provider flow
-npx 10x-chat@latest video -p "Neon street, rain" --provider flow --model "Veo 3.1 - Quality" --orientation portrait
+npx 10x-chat@latest video -p "Neon street, rain" --provider flow --model "Omni Flash" --duration 10 --orientation portrait
+npx 10x-chat@latest video -p "Neon street, rain" --provider flow --model "Veo 3.1 - Quality" --duration 8
 npx 10x-chat@latest login dreamina   # one-time CapCut login for Dreamina
-npx 10x-chat@latest video -p "A paper boat in a rain gutter, macro" --provider dreamina --aspect 9:16 --duration 4
+npx 10x-chat@latest video -p "A paper boat in a rain gutter, macro" --provider dreamina --aspect 9:16 --dreamina-duration 4
 npx 10x-chat@latest video -p "The glowing orb floats up" --provider dreamina --image ref.png --ref-mode omni
 
 # Dry run / clipboard
@@ -161,6 +162,8 @@ kill $(cat ~/.10x-chat/browser-daemon.json | python3 -c "import sys,json; print(
 - **Research needs longer timeouts**: `--timeout 600000` for 10-min research jobs
 - **Image gen can take 1-2 min**: use `--timeout 120000` when needed
 - **Video gen can take 1-5 min**: Dreamina queues generations; keep the default 10-min timeout. For image-to-video, pass `--image` (Dreamina) or `--start-frame`/`--end-frame` with `--mode frames` (Flow)
+- **Flow duration**: `--duration 4|6|8|10` sets clip length in seconds (default is whatever Flow's UI defaults to, currently 8s)
+- **Dreamina duration**: use `--dreamina-duration` (not `--duration`) to avoid conflict with Flow's flag
 - **Dreamina models are plan-gated**: `Seedance 2.0 Fast` (cheapest) and `2.0` are generally available; the CLI errors clearly if a requested model is locked
 - **Use `--dry-run`** to preview what will be sent
 
