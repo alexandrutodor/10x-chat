@@ -78,8 +78,8 @@ npx 10x-chat@latest research -p "Market analysis of EVs" --provider chatgpt --ti
 
 # Video generation (Flow / Veo default, or Dreamina / Seedance)
 npx 10x-chat@latest video -p "Drone shot over snowy peaks at sunrise" --provider flow
-npx 10x-chat@latest video -p "Neon street, rain" --provider flow --model "Omni Flash" --duration 10 --orientation portrait
-npx 10x-chat@latest video -p "She walks forward" --provider flow --image ref.png    # image-to-video
+npx 10x-chat@latest video -p "She walks, TikTok style" --provider flow --orientation portrait --duration 8 --image ref.png  # 9:16 i2v
+npx 10x-chat@latest video -p "Neon street, rain" --provider flow --model "Veo 3.1 - Quality" --duration 10
 npx 10x-chat@latest login dreamina   # one-time CapCut login for Dreamina
 npx 10x-chat@latest video -p "A paper boat in a rain gutter, macro" --provider dreamina --aspect 9:16 --dreamina-duration 4
 npx 10x-chat@latest video -p "The glowing orb floats up" --provider dreamina --image ref.png --ref-mode omni

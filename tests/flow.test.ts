@@ -156,16 +156,16 @@ describe('Flow Provider', () => {
       expect(FLOW_SELECTORS.framesTab).toBe('button[role="tab"]:has-text("Frames")');
     });
 
-    it('should define orientation selectors', () => {
-      expect(FLOW_SELECTORS.landscapeBtn).toBe('button:has-text("Landscape")');
-      expect(FLOW_SELECTORS.portraitBtn).toBe('button:has-text("Portrait")');
+    it('should define orientation selectors as exact aspect-ratio buttons', () => {
+      expect(FLOW_SELECTORS.landscapeBtn).toBe('button:text-is("16:9")');
+      expect(FLOW_SELECTORS.portraitBtn).toBe('button:text-is("9:16")');
     });
 
     it('should define count selectors for 1-4', () => {
-      expect(FLOW_SELECTORS.countX1).toBe('button[role="tab"]:has-text("x1")');
-      expect(FLOW_SELECTORS.countX2).toBe('button[role="tab"]:has-text("x2")');
-      expect(FLOW_SELECTORS.countX3).toBe('button[role="tab"]:has-text("x3")');
-      expect(FLOW_SELECTORS.countX4).toBe('button[role="tab"]:has-text("x4")');
+      expect(FLOW_SELECTORS.countX1).toBe('button[role="tab"]:text-is("1x")');
+      expect(FLOW_SELECTORS.countX2).toBe('button[role="tab"]:text-is("x2")');
+      expect(FLOW_SELECTORS.countX3).toBe('button[role="tab"]:text-is("x3")');
+      expect(FLOW_SELECTORS.countX4).toBe('button[role="tab"]:text-is("x4")');
     });
 
     it('should define frame upload selectors', () => {
@@ -194,8 +194,8 @@ describe('Flow Provider', () => {
         visibleSelectors: {
           [FLOW_SELECTORS.modelPill]: true,
           Video: true,
-          Landscape: true,
-          x1: true,
+          '16:9': true,
+          '1x': true,
         },
       });
 
@@ -214,7 +214,7 @@ describe('Flow Provider', () => {
         visibleSelectors: {
           [FLOW_SELECTORS.modelPill]: true,
           Video: true,
-          Portrait: true,
+          '9:16': true,
           x3: true,
         },
       });
@@ -226,8 +226,8 @@ describe('Flow Provider', () => {
 
       // Should have clicked Video tab
       expect(clickedSelectors.some((s) => s.includes('Video'))).toBe(true);
-      // Should have clicked Portrait
-      expect(clickedSelectors.some((s) => s.includes('Portrait'))).toBe(true);
+      // Should have clicked 9:16
+      expect(clickedSelectors.some((s) => s.includes('9:16'))).toBe(true);
       // Should have clicked x3
       expect(clickedSelectors.some((s) => s.includes('x3'))).toBe(true);
     });
@@ -237,8 +237,8 @@ describe('Flow Provider', () => {
         visibleSelectors: {
           [FLOW_SELECTORS.modelPill]: true,
           Video: true,
-          Landscape: true,
-          x1: true,
+          '16:9': true,
+          '1x': true,
           arrow_drop_down: true,
           'Veo 3.1 - Quality': true,
         },
@@ -257,8 +257,8 @@ describe('Flow Provider', () => {
         visibleSelectors: {
           [FLOW_SELECTORS.modelPill]: true,
           Video: true,
-          Landscape: true,
-          x1: true,
+          '16:9': true,
+          '1x': true,
         },
       });
 

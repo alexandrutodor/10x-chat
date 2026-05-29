@@ -36,21 +36,22 @@ export const FLOW_SELECTORS = {
   ingredientsTab: 'button[role="tab"]:has-text("Ingredients")',
   framesTab: 'button[role="tab"]:has-text("Frames")',
 
-  // Orientation
-  landscapeBtn: 'button:has-text("Landscape")',
-  portraitBtn: 'button:has-text("Portrait")',
+  // Orientation — UI shows aspect-ratio buttons (9:16 / 16:9), not text labels.
+  // :text-is() is exact match — prevents false hit on "Video · 8s □ 1x" status pill.
+  landscapeBtn: 'button:text-is("16:9")',
+  portraitBtn: 'button:text-is("9:16")',
 
-  // Count
-  countX1: 'button[role="tab"]:has-text("x1")',
-  countX2: 'button[role="tab"]:has-text("x2")',
-  countX3: 'button[role="tab"]:has-text("x3")',
-  countX4: 'button[role="tab"]:has-text("x4")',
+  // Count — first button is "1x"; rest are "x2"/"x3"/"x4" (confirmed from UI screenshot)
+  countX1: 'button[role="tab"]:text-is("1x")',
+  countX2: 'button[role="tab"]:text-is("x2")',
+  countX3: 'button[role="tab"]:text-is("x3")',
+  countX4: 'button[role="tab"]:text-is("x4")',
 
-  // Duration (seconds) — tab buttons shown after model selection
-  duration4s: 'button[role="tab"]:has-text("4s"), button:has-text("4s")',
-  duration6s: 'button[role="tab"]:has-text("6s"), button:has-text("6s")',
-  duration8s: 'button[role="tab"]:has-text("8s"), button:has-text("8s")',
-  duration10s: 'button[role="tab"]:has-text("10s"), button:has-text("10s")',
+  // Duration (seconds) — :text-is() for exact match, fallback broader selector second
+  duration4s: 'button[role="tab"]:text-is("4s"), button:text-is("4s")',
+  duration6s: 'button[role="tab"]:text-is("6s"), button:text-is("6s")',
+  duration8s: 'button[role="tab"]:text-is("8s"), button:text-is("8s")',
+  duration10s: 'button[role="tab"]:text-is("10s"), button:text-is("10s")',
 
   // Model dropdown (within popup)
   modelDropdown: 'button:has-text("arrow_drop_down")',
