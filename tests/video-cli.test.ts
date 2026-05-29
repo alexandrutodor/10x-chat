@@ -64,14 +64,26 @@ describe('Video CLI Command', () => {
   });
 
   it('should have Dreamina-specific options', () => {
-    for (const long of ['--aspect', '--resolution', '--duration', '--ref-mode', '--image']) {
+    for (const long of ['--aspect', '--resolution', '--dreamina-duration', '--ref-mode']) {
       expect(cmd.options.find((o) => o.long === long)).toBeDefined();
     }
   });
 
-  it('should collect repeatable --image into an array (default empty)', () => {
+  it('should have --image as shared repeatable option with empty default', () => {
     const imageOpt = cmd.options.find((o) => o.long === '--image');
     expect(imageOpt).toBeDefined();
     expect(imageOpt?.defaultValue).toEqual([]);
+  });
+
+  it('should have --image description mentioning both Flow and Dreamina', () => {
+    const imageOpt = cmd.options.find((o) => o.long === '--image');
+    expect(imageOpt?.description).toContain('Flow');
+    expect(imageOpt?.description).toContain('Dreamina');
+  });
+
+  it('should have --duration option for Flow clip length', () => {
+    const durOpt = cmd.options.find((o) => o.long === '--duration');
+    expect(durOpt).toBeDefined();
+    expect(durOpt?.description).toContain('flow');
   });
 });

@@ -202,6 +202,59 @@ export async function configureVideoMode(
 }
 
 /**
+ * Upload a single reference image in Ingredients mode.
+ *
+ * Two strategies, attempted in order:
+ *   A. filechooser event: click "Add Media" → "Upload image", intercept the
+ *      native dialog with page.waitForEvent('filechooser') before it can open.
+ *   B. Direct setInputFiles: if the file input is already in the DOM (hidden),
+ *      set files on it directly — avoids triggering the dialog entirely.
+ */
+export async function uploadIngredientImage(page: Page, imagePath: string): Promise<void> {
+  // Strategy A — open the "Add Media" menu and intercept the file chooser
+  const addMediaBtn = page.locator(FLOW_SELECTORS.addMedia).first();
+  if (await addMediaBtn.isVisible().catch(() => false)) {
+    await addMediaBtn.click({ force: true });
+    await page.waitForTimeout(800);
+
+    const uploadItem = page.locator(FLOW_SELECTORS.uploadImage).first();
+    if (await uploadItem.isVisible().catch(() => false)) {
+      try {
+        // waitForEvent must be set up BEFORE the click that triggers the dialog
+        const [fileChooser] = await Promise.all([
+          page.waitForEvent('filechooser', { timeout: 5_000 }),
+          uploadItem.click({ force: true }),
+        ]);
+        await fileChooser.setFiles(imagePath);
+        await page.waitForTimeout(3000);
+        return;
+      } catch {
+        // Dialog didn't open — fall through to strategy B
+      }
+    }
+  }
+
+  // Strategy B — file input already in DOM (hidden), set files directly
+  const fileInput = page.locator(FLOW_SELECTORS.fileInput).first();
+  const inputAttached = await fileInput
+    .waitFor({ state: 'attached', timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+
+  if (inputAttached) {
+    await fileInput.setInputFiles(imagePath);
+    await page.waitForTimeout(3000);
+    return;
+  }
+
+  // Both strategies failed — the user explicitly passed --image, so this is an error
+  throw new Error(
+    'Flow "Add Media" button and file input not found — could not upload reference image. ' +
+      'Try running with --headed to debug the UI state.',
+  );
+}
+
+/**
  * Upload keyframe images in Frames mode.
  */
 export async function uploadKeyframes(

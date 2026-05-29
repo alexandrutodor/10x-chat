@@ -121,7 +121,7 @@ Generate video via browser automation — **Google Flow** (Veo) or **Dreamina** 
 # Google Flow / Veo (default) — uses your Google login (shared with Gemini)
 npx 10x-chat@latest video -p "A drone shot over snowy mountains at sunrise" --provider flow
 npx 10x-chat@latest video -p "Neon city street, rain" --provider flow --model "Omni Flash" --duration 10 --orientation portrait
-npx 10x-chat@latest video -p "Cinematic timelapse, golden hour" --provider flow --model "Veo 3.1 - Quality" --duration 8
+npx 10x-chat@latest video -p "She walks forward" --provider flow --image ref.png   # image-to-video
 
 # Dreamina / Seedance (CapCut)
 npx 10x-chat@latest login dreamina   # one-time CapCut login
@@ -147,6 +147,7 @@ Shared flags:
 | `--mode <mode>` | `ingredients` (default) or `frames` |
 | `--orientation <dir>` | `landscape` (default) or `portrait` |
 | `--count <n>` | Simultaneous generations (1-4) |
+| `--image <path>` | Reference image for image-to-video (ingredients mode) |
 | `--duration <secs>` | Clip length in seconds: `4`, `6`, `8`, `10` |
 | `--start-frame <path>` / `--end-frame <path>` | Keyframe images (frames mode) |
 

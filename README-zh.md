@@ -112,6 +112,7 @@ npx 10x-chat@latest video -p "發光的球體脈動並向上飄浮" --provider d
 | `--mode <mode>` | `ingredients`（預設）或 `frames` |
 | `--orientation <dir>` | `landscape`（預設）或 `portrait` |
 | `--count <n>` | 同時生成數量（1-4） |
+| `--image <path>` | 圖生影片的參考圖片（ingredients 模式） |
 | `--duration <secs>` | 影片長度（秒）：`4`、`6`、`8`、`10` |
 | `--start-frame <path>` / `--end-frame <path>` | 關鍵影格圖片（frames 模式） |
 

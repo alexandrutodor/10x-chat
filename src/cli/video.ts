@@ -48,9 +48,10 @@ export function createVideoCommand(): Command {
     .option('--resolution <res>', '[dreamina] Resolution: 720P (default) or 1080P')
     .option('--dreamina-duration <secs>', '[dreamina] Clip length in seconds (4-15)')
     .option('--ref-mode <mode>', '[dreamina] Input-image mode: omni (default), frames, multiframes')
+    // ── Shared image option ──
     .option(
       '--image <path>',
-      '[dreamina] Reference/input image (repeatable, up to 12)',
+      'Reference image for image-to-video. Flow: first image used as ingredient. Dreamina: repeatable, up to 12.',
       collect,
       [],
     )
@@ -199,6 +200,15 @@ async function runFlowCommand(options: Record<string, unknown>, timeoutMs: numbe
     fail('Frames mode requires --start-frame and/or --end-frame');
   }
 
+  const images = (options.image as string[]) ?? [];
+  // Flow only uses the first image as a reference ingredient
+  const refImage = images[0] as string | undefined;
+  if (images.length > 1) {
+    console.warn(
+      chalk.yellow(`⚠ Flow only uses one reference image — using ${refImage}, ignoring the rest`),
+    );
+  }
+
   try {
     console.log(chalk.bold.blue('🎬 Google Flow Video Generation\n'));
     const result = await runVideo({
@@ -208,6 +218,7 @@ async function runFlowCommand(options: Record<string, unknown>, timeoutMs: numbe
       orientation: orientation as VideoOrientation,
       count: count as 1 | 2 | 3 | 4,
       durationSecs,
+      refImage,
       startFrame: options.startFrame as string | undefined,
       endFrame: options.endFrame as string | undefined,
       headed: options.headed as boolean | undefined,

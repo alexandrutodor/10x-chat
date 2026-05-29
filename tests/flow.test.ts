@@ -4,6 +4,7 @@ import {
   FLOW_CONFIG,
   FLOW_SELECTORS,
   flowActions,
+  uploadIngredientImage,
   waitForGeneration,
 } from '../src/providers/flow.js';
 
@@ -64,6 +65,8 @@ function createMockPage(opts: MockPageOpts = {}) {
   const clickedSelectors: string[] = [];
   let evalCallCount = 0;
 
+  const mockFileChooser = { setFiles: vi.fn(async () => {}) };
+
   const page = {
     locator: vi.fn((selector: string) => {
       locatorCalls.push(selector);
@@ -78,6 +81,7 @@ function createMockPage(opts: MockPageOpts = {}) {
     }),
     waitForTimeout: vi.fn(async () => {}),
     waitForLoadState: vi.fn(async () => {}),
+    waitForEvent: vi.fn(async () => mockFileChooser),
     keyboard: {
       press: vi.fn(async () => {}),
     },
@@ -90,7 +94,7 @@ function createMockPage(opts: MockPageOpts = {}) {
     url: vi.fn(() => 'https://labs.google/fx/tools/flow'),
   };
 
-  return { page, locatorCalls, clickedSelectors };
+  return { page, locatorCalls, clickedSelectors, mockFileChooser };
 }
 
 // ── Static config tests ─────────────────────────────────────────
@@ -432,6 +436,73 @@ describe('Flow Provider', () => {
 
       expect(chunks.length).toBeGreaterThan(0);
       expect(chunks.some((c) => c.includes('30%'))).toBe(true);
+    });
+  });
+
+  // ── uploadIngredientImage ───────────────────────────────────────
+
+  describe('uploadIngredientImage', () => {
+    it('strategy A: uses filechooser event when Add Media and Upload image are visible', async () => {
+      const { page, mockFileChooser } = createMockPage({
+        visibleSelectors: {
+          'Add Media': true,
+          'Upload image': true,
+        },
+      });
+
+      await uploadIngredientImage(page as never, '/tmp/ref.png');
+
+      // waitForEvent('filechooser') should have been called
+      expect(page.waitForEvent).toHaveBeenCalledWith('filechooser', expect.any(Object));
+      // The file chooser should have received the file
+      expect(mockFileChooser.setFiles).toHaveBeenCalledWith('/tmp/ref.png');
+    });
+
+    it('strategy B: falls back to setInputFiles when filechooser times out', async () => {
+      const { page } = createMockPage({
+        visibleSelectors: {
+          'Add Media': true,
+          'Upload image': true,
+          'input[type="file"]': true,
+        },
+      });
+      // Simulate filechooser timeout
+      page.waitForEvent = vi.fn(async () => {
+        throw new Error('Timeout waiting for filechooser');
+      });
+
+      // setInputFiles is on the locator — spy on it
+      const setInputFilesSpy = vi.fn(async () => {});
+      page.locator = vi.fn((sel: string) => {
+        const loc = createMockLocator({ visible: true });
+        loc.setInputFiles = setInputFilesSpy;
+        loc.waitFor = vi.fn(async () => {});
+        return loc;
+      });
+
+      await uploadIngredientImage(page as never, '/tmp/ref.png');
+      expect(setInputFilesSpy).toHaveBeenCalledWith('/tmp/ref.png');
+    });
+
+    it('throws when neither strategy succeeds', async () => {
+      const { page } = createMockPage({
+        visibleSelectors: {}, // nothing visible
+      });
+      page.waitForEvent = vi.fn(async () => {
+        throw new Error('timeout');
+      });
+      // file input not attached
+      page.locator = vi.fn(() => {
+        const loc = createMockLocator({ visible: false });
+        loc.waitFor = vi.fn(async () => {
+          throw new Error('not attached');
+        });
+        return loc;
+      });
+
+      await expect(uploadIngredientImage(page as never, '/tmp/ref.png')).rejects.toThrow(
+        'Add Media',
+      );
     });
   });
 });

@@ -7,6 +7,7 @@ import { loadConfig } from '../config.js';
 import {
   configureVideoMode,
   FLOW_CONFIG,
+  uploadIngredientImage,
   uploadKeyframes,
   waitForGeneration,
 } from '../providers/flow.js';
@@ -49,6 +50,7 @@ export async function runVideo(options: VideoOptions): Promise<VideoResult> {
   console.log(chalk.blue(`Provider: ${FLOW_CONFIG.displayName}`));
   console.log(chalk.dim(`Model: ${options.model ?? FLOW_CONFIG.defaultModel}`));
   console.log(chalk.dim(`Mode: ${options.mode ?? 'ingredients'}`));
+  if (options.refImage) console.log(chalk.dim(`Ref image: ${options.refImage}`));
 
   // Note: Flow always uses shared persistent profile for Google SPA auth
 
@@ -169,6 +171,12 @@ export async function runVideo(options: VideoOptions): Promise<VideoResult> {
       count: options.count,
       durationSecs: options.durationSecs,
     });
+
+    // Upload reference image (ingredients mode image-to-video)
+    if (options.refImage && options.mode !== 'frames') {
+      console.log(chalk.dim(`Uploading reference image: ${options.refImage}`));
+      await uploadIngredientImage(page, options.refImage);
+    }
 
     // Upload keyframes if in frames mode
     if (options.mode === 'frames' && (options.startFrame || options.endFrame)) {

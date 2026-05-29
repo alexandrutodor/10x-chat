@@ -210,6 +210,8 @@ export interface VideoOptions {
   orientation?: VideoOrientation;
   count?: 1 | 2 | 3 | 4;
   durationSecs?: 4 | 6 | 8 | 10;
+  /** Reference image for ingredients mode (image-to-video). Single file. */
+  refImage?: string;
   startFrame?: string;
   endFrame?: string;
   headed?: boolean;
