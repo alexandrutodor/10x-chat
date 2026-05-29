@@ -19,13 +19,13 @@ import type { VideoMode, VideoModel, VideoOrientation } from '../types.js';
 
 const VALID_PROVIDERS = ['flow', 'dreamina'] as const;
 const VALID_MODES = ['ingredients', 'frames'] as const;
-const VALID_MODELS = [
+const VALID_FLOW_MODELS = [
+  'Omni Flash',
+  'Veo 3.1 - Lite',
   'Veo 3.1 - Fast',
-  'Veo 3.1 - Fast [Lower Priority]',
   'Veo 3.1 - Quality',
-  'Veo 2 - Fast',
-  'Veo 2 - Quality',
 ] as const;
+const VALID_FLOW_DURATIONS = [4, 6, 8, 10] as const;
 const VALID_ORIENTATIONS = ['landscape', 'portrait'] as const;
 
 const collect = (value: string, prev: string[]): string[] => [...prev, value];
@@ -40,12 +40,13 @@ export function createVideoCommand(): Command {
     .option('--mode <mode>', '[flow] Video mode: ingredients (default) or frames', 'ingredients')
     .option('--orientation <dir>', '[flow] landscape (default) or portrait', 'landscape')
     .option('--count <n>', '[flow] Number of simultaneous generations (1-4)', '1')
+    .option('--duration <secs>', '[flow] Clip length in seconds: 4, 6, 8 (default), or 10')
     .option('--start-frame <path>', '[flow] First keyframe image (frames mode)')
     .option('--end-frame <path>', '[flow] Last keyframe image (frames mode)')
     // ── Dreamina (Seedance) options ──
     .option('--aspect <ratio>', '[dreamina] Aspect ratio (e.g. 16:9, 9:16, 1:1)')
     .option('--resolution <res>', '[dreamina] Resolution: 720P (default) or 1080P')
-    .option('--duration <secs>', '[dreamina] Clip length in seconds (4-15)')
+    .option('--dreamina-duration <secs>', '[dreamina] Clip length in seconds (4-15)')
     .option('--ref-mode <mode>', '[dreamina] Input-image mode: omni (default), frames, multiframes')
     .option(
       '--image <path>',
@@ -115,15 +116,15 @@ async function runDreaminaCommand(
   }
 
   let durationSecs: number | undefined;
-  if (options.duration !== undefined) {
-    durationSecs = Number.parseInt(options.duration as string, 10);
+  if (options.dreaminaDuration !== undefined) {
+    durationSecs = Number.parseInt(options.dreaminaDuration as string, 10);
     if (
       !Number.isFinite(durationSecs) ||
       durationSecs < DREAMINA_MIN_DURATION ||
       durationSecs > DREAMINA_MAX_DURATION
     ) {
       fail(
-        `Invalid duration: ${options.duration}. Must be ${DREAMINA_MIN_DURATION}-${DREAMINA_MAX_DURATION} seconds`,
+        `Invalid --dreamina-duration: ${options.dreaminaDuration}. Must be ${DREAMINA_MIN_DURATION}-${DREAMINA_MAX_DURATION} seconds`,
       );
     }
   }
@@ -162,7 +163,7 @@ async function runDreaminaCommand(
   }
 }
 
-// ── Flow (existing behaviour) ─────────────────────────────────────
+// ── Flow ──────────────────────────────────────────────────────────
 
 async function runFlowCommand(options: Record<string, unknown>, timeoutMs: number): Promise<void> {
   const mode = options.mode as string;
@@ -170,9 +171,9 @@ async function runFlowCommand(options: Record<string, unknown>, timeoutMs: numbe
     fail(`Invalid mode: ${mode}. Must be one of: ${VALID_MODES.join(', ')}`);
   }
 
-  const model = (options.model as string | undefined) ?? 'Veo 3.1 - Fast';
-  if (!VALID_MODELS.includes(model as VideoModel)) {
-    fail(`Invalid model: ${model}. Must be one of:\n  ${VALID_MODELS.join('\n  ')}`);
+  const model = (options.model as string | undefined) ?? 'Omni Flash';
+  if (!VALID_FLOW_MODELS.includes(model as VideoModel)) {
+    fail(`Invalid model: ${model}. Must be one of:\n  ${VALID_FLOW_MODELS.join('\n  ')}`);
   }
 
   const orientation = options.orientation as string;
@@ -182,6 +183,17 @@ async function runFlowCommand(options: Record<string, unknown>, timeoutMs: numbe
 
   const count = Number.parseInt(options.count as string, 10);
   if (![1, 2, 3, 4].includes(count)) fail('Count must be 1, 2, 3, or 4');
+
+  let durationSecs: (typeof VALID_FLOW_DURATIONS)[number] | undefined;
+  if (options.duration !== undefined) {
+    const d = Number.parseInt(options.duration as string, 10);
+    if (!VALID_FLOW_DURATIONS.includes(d as (typeof VALID_FLOW_DURATIONS)[number])) {
+      fail(
+        `Invalid --duration: ${options.duration}. Must be one of: ${VALID_FLOW_DURATIONS.join(', ')} (seconds)`,
+      );
+    }
+    durationSecs = d as (typeof VALID_FLOW_DURATIONS)[number];
+  }
 
   if (mode === 'frames' && !options.startFrame && !options.endFrame) {
     fail('Frames mode requires --start-frame and/or --end-frame');
@@ -195,6 +207,7 @@ async function runFlowCommand(options: Record<string, unknown>, timeoutMs: numbe
       model: model as VideoModel,
       orientation: orientation as VideoOrientation,
       count: count as 1 | 2 | 3 | 4,
+      durationSecs,
       startFrame: options.startFrame as string | undefined,
       endFrame: options.endFrame as string | undefined,
       headed: options.headed as boolean | undefined,

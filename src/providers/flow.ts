@@ -6,14 +6,8 @@ export const FLOW_CONFIG: ProviderConfig = {
   displayName: 'Google Flow',
   url: 'https://labs.google/fx/tools/flow',
   loginUrl: 'https://labs.google/fx/tools/flow',
-  models: [
-    'Veo 3.1 - Fast',
-    'Veo 3.1 - Fast [Lower Priority]',
-    'Veo 3.1 - Quality',
-    'Veo 2 - Fast',
-    'Veo 2 - Quality',
-  ],
-  defaultModel: 'Veo 3.1 - Fast',
+  models: ['Omni Flash', 'Veo 3.1 - Lite', 'Veo 3.1 - Fast', 'Veo 3.1 - Quality'],
+  defaultModel: 'Omni Flash',
   defaultTimeoutMs: 10 * 60 * 1000, // 10 mins — video gen is slow
 };
 
@@ -51,6 +45,12 @@ export const FLOW_SELECTORS = {
   countX2: 'button[role="tab"]:has-text("x2")',
   countX3: 'button[role="tab"]:has-text("x3")',
   countX4: 'button[role="tab"]:has-text("x4")',
+
+  // Duration (seconds) — tab buttons shown after model selection
+  duration4s: 'button[role="tab"]:has-text("4s"), button:has-text("4s")',
+  duration6s: 'button[role="tab"]:has-text("6s"), button:has-text("6s")',
+  duration8s: 'button[role="tab"]:has-text("8s"), button:has-text("8s")',
+  duration10s: 'button[role="tab"]:has-text("10s"), button:has-text("10s")',
 
   // Model dropdown (within popup)
   modelDropdown: 'button:has-text("arrow_drop_down")',
@@ -102,6 +102,7 @@ export async function configureVideoMode(
     model?: VideoModel;
     orientation?: 'landscape' | 'portrait';
     count?: 1 | 2 | 3 | 4;
+    durationSecs?: 4 | 6 | 8 | 10;
   },
 ): Promise<void> {
   await openModelSelector(page);
@@ -164,7 +165,7 @@ export async function configureVideoMode(
   }
 
   // 5. Select model only if non-default (avoids problematic dropdown click)
-  if (opts.model && opts.model !== 'Veo 3.1 - Fast') {
+  if (opts.model && opts.model !== 'Omni Flash') {
     const modelDropdown = page.locator(FLOW_SELECTORS.modelDropdown).last();
     if (await modelDropdown.isVisible().catch(() => false)) {
       await modelDropdown.click({ force: true });
@@ -175,6 +176,23 @@ export async function configureVideoMode(
         await modelOption.click({ force: true });
         await page.waitForTimeout(500);
       }
+    }
+  }
+
+  // 6. Set duration (4s / 6s / 8s / 10s tabs — shown after model selection)
+  if (opts.durationSecs) {
+    const durSel = {
+      4: FLOW_SELECTORS.duration4s,
+      6: FLOW_SELECTORS.duration6s,
+      8: FLOW_SELECTORS.duration8s,
+      10: FLOW_SELECTORS.duration10s,
+    }[opts.durationSecs];
+    const durBtn = page.locator(durSel).first();
+    if (await durBtn.isVisible().catch(() => false)) {
+      await durBtn.click({ force: true });
+      await page.waitForTimeout(300);
+    } else {
+      console.warn(`⚠ Duration button "${opts.durationSecs}s" not found — using default`);
     }
   }
 

@@ -167,6 +167,7 @@ export async function runVideo(options: VideoOptions): Promise<VideoResult> {
       model: options.model,
       orientation: options.orientation,
       count: options.count,
+      durationSecs: options.durationSecs,
     });
 
     // Upload keyframes if in frames mode

@@ -112,14 +112,14 @@ describe('Flow Provider', () => {
     it('should have available models', () => {
       expect(FLOW_CONFIG.models).toBeDefined();
       expect(FLOW_CONFIG.models?.length).toBeGreaterThan(0);
+      expect(FLOW_CONFIG.models).toContain('Omni Flash');
+      expect(FLOW_CONFIG.models).toContain('Veo 3.1 - Lite');
       expect(FLOW_CONFIG.models).toContain('Veo 3.1 - Fast');
       expect(FLOW_CONFIG.models).toContain('Veo 3.1 - Quality');
-      expect(FLOW_CONFIG.models).toContain('Veo 2 - Fast');
-      expect(FLOW_CONFIG.models).toContain('Veo 2 - Quality');
     });
 
-    it('should default to Veo 3.1 - Fast model', () => {
-      expect(FLOW_CONFIG.defaultModel).toBe('Veo 3.1 - Fast');
+    it('should default to Omni Flash model', () => {
+      expect(FLOW_CONFIG.defaultModel).toBe('Omni Flash');
     });
 
     it('should have a 10-minute default timeout for video generation', () => {
@@ -259,7 +259,7 @@ describe('Flow Provider', () => {
       });
 
       await configureVideoMode(page as never, {
-        model: 'Veo 3.1 - Fast', // default — should skip dropdown
+        model: 'Omni Flash', // default — should skip dropdown
       });
 
       // Should NOT have tried to open the dropdown
