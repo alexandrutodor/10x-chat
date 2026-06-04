@@ -67,6 +67,10 @@ npx 10x-chat@latest chat --provider gemini --file "path/to/prompt.md" -p "Comple
 npx 10x-chat@latest chat --provider gemini --model Pro -p "Solve this math problem"
 npx 10x-chat@latest chat --provider gemini --model "Deep Think" -p "Solve this hard problem"
 
+# Multi-step provider delegate for external AI callers (JSONL over stdin/stdout)
+npx 10x-chat@latest delegate gemini --model Pro
+# then send JSON lines: {"action":"status"}, {"action":"submit","prompt":"..."}, {"action":"capture"}, {"action":"close"}
+
 # Image generation
 npx 10x-chat@latest image -p "A fox astronaut in space" --provider chatgpt
 npx 10x-chat@latest image -p "Watercolor landscape" --provider gemini --save-dir ./images
@@ -105,6 +109,35 @@ npx 10x-chat@latest notebooklm summarize <id>
 # Install bundled skill to coding agent
 npx 10x-chat@latest skill install
 ```
+
+## Provider delegate (v0.10.18+)
+
+Use `delegate <provider>` when an external AI caller needs flexible multi-step control instead of a single one-shot `chat`, `image`, or `research` command. It opens one provider tab, keeps it alive, reads JSONL commands from stdin, and emits JSONL responses on stdout.
+
+```bash
+npx 10x-chat@latest delegate gemini --model Pro <<'EOF'
+{"id":1,"action":"status"}
+{"id":2,"action":"submit","prompt":"Draft three launch angles for this product."}
+{"id":3,"action":"capture","timeoutMs":600000}
+{"id":4,"action":"close"}
+EOF
+
+printf '%s\n' '{"action":"chat","model":"Thinking","prompt":"Review this pasted plan."}' \
+  | npx 10x-chat@latest delegate gemini
+```
+
+Actions:
+- `status`: return url/title/login state
+- `goto`: navigate with `{ "url": "https://..." }`
+- `selectModel`: provider UI model/mode switch with `{ "model": "Pro" }`
+- `attach`: attach files with `{ "files": ["path/to/file.png"] }`
+- `submit`: submit prompt without waiting
+- `capture`: wait for and extract the current response
+- `chat`: select optional model/files, submit, then capture
+- `eval`: run a page evaluation script for inspection/debugging
+- `close`: close the browser tab and end the delegate
+
+Flags: `--model`, `--headed`, `--timeout <ms>`, `--isolated-profile`, `--no-login-check`.
 
 ## Parallel sessions (v0.9.0+)
 

@@ -74,6 +74,34 @@ npx 10x-chat@latest chat -p "Long task" --timeout 600000 --headed  # 10min timeo
 | `--headed` | Show browser window during chat |
 | `--timeout <ms>` | Response timeout in milliseconds (default: 300000) |
 
+### `delegate <provider>`
+
+Start a provider-specific JSONL delegate for external AI callers that need multi-step control instead of a single one-shot prompt. The delegate opens the provider once, keeps the tab alive, then reads JSON commands from stdin and writes JSON responses to stdout.
+
+```bash
+# One long-lived provider session controlled over JSONL
+npx 10x-chat@latest delegate gemini --model Pro <<'EOF'
+{"id":1,"action":"status"}
+{"id":2,"action":"submit","prompt":"Draft three launch angles for this product."}
+{"id":3,"action":"capture","timeoutMs":600000}
+{"id":4,"action":"close"}
+EOF
+
+# Convenience combined action: select model/files, submit, capture
+printf '%s\n' '{"action":"chat","model":"Thinking","prompt":"Review this pasted plan."}' \
+  | npx 10x-chat@latest delegate gemini
+```
+
+Supported actions: `status`, `goto`, `selectModel`, `attach`, `submit`, `capture`, `chat`, `eval`, `close`.
+
+| Flag | Description |
+|------|-------------|
+| `--model <name>` | Select a model/mode immediately after opening |
+| `--headed` | Show browser window |
+| `--timeout <ms>` | Default capture timeout |
+| `--isolated-profile` | Use per-provider browser profile |
+| `--no-login-check` | Start even if login detection fails |
+
 ### `image`
 
 Generate images via ChatGPT (DALL-E), Gemini (Imagen), or Grok with non-blocking polling.

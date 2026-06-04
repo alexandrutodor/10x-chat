@@ -8,6 +8,7 @@ import { Command } from 'commander';
 import { stopDaemon } from '../browser/daemon.js';
 import { createChatCommand } from '../cli/chat.js';
 import { createConfigCommand } from '../cli/config.js';
+import { createDelegateCommand } from '../cli/delegate.js';
 import { createHistoryCommand } from '../cli/history.js';
 import { createImageCommand } from '../cli/image.js';
 import { createLoginCommand } from '../cli/login.js';
@@ -47,6 +48,7 @@ program
 
 program.addCommand(createLoginCommand());
 program.addCommand(createChatCommand());
+program.addCommand(createDelegateCommand());
 program.addCommand(createHistoryCommand());
 program.addCommand(createImageCommand());
 program.addCommand(createResearchCommand());

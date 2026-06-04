@@ -473,7 +473,7 @@ describe('Flow Provider', () => {
 
       // setInputFiles is on the locator — spy on it
       const setInputFilesSpy = vi.fn(async () => {});
-      page.locator = vi.fn((sel: string) => {
+      page.locator = vi.fn((_sel: string) => {
         const loc = createMockLocator({ visible: true });
         loc.setInputFiles = setInputFilesSpy;
         loc.waitFor = vi.fn(async () => {});
