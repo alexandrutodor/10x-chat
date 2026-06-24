@@ -140,11 +140,14 @@ export interface ChatOptions {
   copy?: boolean;
   dryRun?: boolean;
   headed?: boolean;
+  headless?: boolean;
   timeoutMs?: number;
   /** Directory to save generated images. Defaults to session dir. */
   saveImages?: string;
   /** Override to use isolated (per-provider) profiles regardless of config. */
   isolatedProfile?: boolean;
+  /** Named browser profile under ~/.10x-chat/profiles/<name>. */
+  profile?: string;
 }
 
 // ── Research Types ──────────────────────────────────────────────
@@ -159,6 +162,8 @@ export interface ResearchOptions {
   model?: string;
   saveDir?: string;
   isolatedProfile?: boolean;
+  /** Named browser profile under ~/.10x-chat/profiles/<name>. */
+  profile?: string;
 }
 
 export interface ResearchResult {

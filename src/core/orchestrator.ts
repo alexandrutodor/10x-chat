@@ -36,7 +36,12 @@ export async function runChat(options: ChatOptions): Promise<ChatResult> {
   const providerName = options.provider ?? config.defaultProvider;
   const provider = getProvider(providerName);
   const timeoutMs = options.timeoutMs ?? config.defaultTimeoutMs;
-  const headless = resolveHeadlessMode(providerName, config.headless, options.headed === true);
+  const headless = resolveHeadlessMode(
+    providerName,
+    config.headless,
+    options.headed === true,
+    options.headless === true,
+  );
 
   // Build the bundle
   const bundle = await buildBundle({
@@ -52,7 +57,7 @@ export async function runChat(options: ChatOptions): Promise<ChatResult> {
   console.log(chalk.blue(`Provider: ${provider.config.displayName}`));
 
   // Determine profile mode: CLI flag overrides config
-  const profileMode = options.isolatedProfile ? 'isolated' : config.profileMode;
+  const profileMode = options.profile || options.isolatedProfile ? 'isolated' : config.profileMode;
 
   // Launch browser — if this fails, mark session as failed
   let browser: Awaited<ReturnType<typeof launchBrowser>>;
@@ -63,6 +68,7 @@ export async function runChat(options: ChatOptions): Promise<ChatResult> {
       headless,
       url: provider.config.url,
       profileMode,
+      profile: options.profile,
     });
   } catch (error) {
     await updateSession(session.id, { status: 'failed' });

@@ -1,13 +1,27 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import type { BrowserContext, Page } from 'playwright';
 import { getIsolatedProfileDir, getSharedProfileDir } from '../paths.js';
 import type { ProfileMode, ProviderName } from '../types.js';
 import { launchSharedBrowserSession } from './daemon.js';
-import { getChromium } from './engine.js';
+import { getChromium, getEngineName } from './engine.js';
 import { acquireProfileLock, type ProfileLock } from './lock.js';
 import { CHROMIUM_ARGS } from './process.js';
 import { saveStorageState } from './state.js';
 import { detectChromeChannel, STEALTH_INIT_SCRIPT } from './stealth.js';
+
+async function markProfileClean(profileDir: string): Promise<void> {
+  const prefsPath = path.join(profileDir, 'Default', 'Preferences');
+  try {
+    const prefs = JSON.parse(await readFile(prefsPath, 'utf8')) as {
+      profile?: { exit_type?: string; exited_cleanly?: boolean };
+    };
+    prefs.profile = { ...(prefs.profile ?? {}), exit_type: 'Normal', exited_cleanly: true };
+    await writeFile(prefsPath, JSON.stringify(prefs));
+  } catch {
+    // New profile or unreadable prefs; Chrome will create/fix it.
+  }
+}
 
 export interface BrowserSession {
   context: BrowserContext;
@@ -32,6 +46,8 @@ export interface LaunchOptions {
    * Defaults to 'shared'.
    */
   profileMode?: ProfileMode;
+  /** Named profile under ~/.10x-chat/profiles/<name>. Forces isolated persistent mode. */
+  profile?: string;
   /**
    * If true, use a persistent context even in shared mode.
    * Used by `login` command which needs the user to interact and have
@@ -57,9 +73,9 @@ export interface LaunchOptions {
  * and profile directory. Original behavior with profile lock.
  */
 export async function launchBrowser(opts: LaunchOptions): Promise<BrowserSession> {
-  const { profileMode = 'shared', persistent = false } = opts;
+  const { profileMode = 'shared', persistent = false, profile } = opts;
 
-  if (profileMode === 'isolated') {
+  if (profile || profileMode === 'isolated') {
     return launchIsolatedBrowser(opts);
   }
 
@@ -97,6 +113,7 @@ async function launchSharedPersistentBrowser(opts: LaunchOptions): Promise<Brows
   await mkdir(profileDir, { recursive: true });
 
   const lock = await acquireProfileLock(profileDir);
+  await markProfileClean(profileDir);
 
   let context: BrowserContext;
   let page: Page;
@@ -108,7 +125,9 @@ async function launchSharedPersistentBrowser(opts: LaunchOptions): Promise<Brows
       ...(channel ? { channel } : {}),
       args: CHROMIUM_ARGS,
     });
-    await context.addInitScript(STEALTH_INIT_SCRIPT);
+    if (getEngineName() !== 'cloakbrowser') {
+      await context.addInitScript(STEALTH_INIT_SCRIPT);
+    }
 
     page = context.pages()[0] ?? (await context.newPage());
 
@@ -142,11 +161,12 @@ async function launchSharedPersistentBrowser(opts: LaunchOptions): Promise<Brows
  * Per-provider persistent context with profile lock.
  */
 async function launchIsolatedBrowser(opts: LaunchOptions): Promise<BrowserSession> {
-  const { provider, headless = true, url } = opts;
-  const profileDir = getIsolatedProfileDir(provider);
+  const { provider, headless = true, url, profile } = opts;
+  const profileDir = getIsolatedProfileDir(profile ?? provider);
   await mkdir(profileDir, { recursive: true });
 
   const lock = await acquireProfileLock(profileDir);
+  await markProfileClean(profileDir);
 
   let context: BrowserContext;
   let page: Page;
@@ -158,7 +178,9 @@ async function launchIsolatedBrowser(opts: LaunchOptions): Promise<BrowserSessio
       ...(channel ? { channel } : {}),
       args: CHROMIUM_ARGS,
     });
-    await context.addInitScript(STEALTH_INIT_SCRIPT);
+    if (getEngineName() !== 'cloakbrowser') {
+      await context.addInitScript(STEALTH_INIT_SCRIPT);
+    }
 
     page = context.pages()[0] ?? (await context.newPage());
 

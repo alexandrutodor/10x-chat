@@ -13,9 +13,18 @@ export function getSharedProfileDir(): string {
   return path.join(getAppDir(), 'profiles', 'default');
 }
 
-/** Isolated profile directory for a specific provider: ~/.10x-chat/profiles/<provider> */
-export function getIsolatedProfileDir(provider: string): string {
-  return path.join(getAppDir(), 'profiles', provider);
+function assertProfileName(name: string): void {
+  if (!/^[A-Za-z0-9._-]+$/.test(name) || name === '.' || name === '..') {
+    throw new Error(
+      'Profile name must contain only letters, numbers, dots, dashes, or underscores',
+    );
+  }
+}
+
+/** Isolated/named profile directory: ~/.10x-chat/profiles/<name> */
+export function getIsolatedProfileDir(name: string): string {
+  assertProfileName(name);
+  return path.join(getAppDir(), 'profiles', name);
 }
 
 /** Sessions root: ~/.10x-chat/sessions */

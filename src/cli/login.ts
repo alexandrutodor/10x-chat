@@ -6,7 +6,7 @@ import { acquireProfileLock, launchBrowser } from '../browser/index.js';
 import { resolveHeadlessMode } from '../browser/mode.js';
 import { saveStorageState } from '../browser/state.js';
 import { loadConfig } from '../config.js';
-import { getSharedProfileDir } from '../paths.js';
+import { getIsolatedProfileDir, getSharedProfileDir } from '../paths.js';
 import { getProvider, isValidProvider, listProviders } from '../providers/index.js';
 import type { ProfileMode, ProviderName } from '../types.js';
 
@@ -20,21 +20,32 @@ export function createLoginCommand(): Command {
     .option('--all', 'Login to all providers')
     .option('--tabs', 'Open all providers as tabs in one browser window (use with --all)')
     .option('--status', 'Check login status for all providers')
+    .option('--profile <name>', 'Use named browser profile')
     .option('--isolated-profile', 'Use per-provider browser profiles (backward compat)')
     .action(
       async (
         providerArg?: string,
-        options?: { all?: boolean; tabs?: boolean; status?: boolean; isolatedProfile?: boolean },
+        options?: {
+          all?: boolean;
+          tabs?: boolean;
+          status?: boolean;
+          profile?: string;
+          isolatedProfile?: boolean;
+        },
       ) => {
         const config = await loadConfig();
-        const profileMode: ProfileMode = options?.isolatedProfile ? 'isolated' : config.profileMode;
+        const profile = options?.profile;
+        const profileMode: ProfileMode =
+          profile || options?.isolatedProfile ? 'isolated' : config.profileMode;
 
         if (options?.status) {
-          await checkLoginStatus(profileMode, config.headless);
+          await checkLoginStatus(profileMode, config.headless, profile);
           return;
         }
 
-        if (profileMode === 'shared') {
+        if (profile) {
+          console.log(chalk.dim(`Using named profile: ${profile}`));
+        } else if (profileMode === 'shared') {
           console.log(
             chalk.dim(
               'Using shared profile (all providers share one browser profile). Use --isolated-profile for per-provider.',
@@ -44,10 +55,10 @@ export function createLoginCommand(): Command {
 
         if (options?.all) {
           if (options?.tabs) {
-            await loginAllWithTabs(listProviders(), profileMode);
+            await loginAllWithTabs(listProviders(), profileMode, profile);
           } else {
             for (const name of listProviders()) {
-              await loginToProvider(name, profileMode);
+              await loginToProvider(name, profileMode, profile);
             }
           }
           return;
@@ -70,7 +81,7 @@ export function createLoginCommand(): Command {
           process.exit(1);
         }
 
-        await loginToProvider(providerArg, profileMode);
+        await loginToProvider(providerArg, profileMode, profile);
       },
     );
 
@@ -80,6 +91,7 @@ export function createLoginCommand(): Command {
 async function loginToProvider(
   providerName: ProviderName,
   profileMode: ProfileMode = 'shared',
+  profile?: string,
 ): Promise<void> {
   const provider = getProvider(providerName);
   console.log(chalk.blue(`Opening ${provider.config.displayName} for login...`));
@@ -90,19 +102,50 @@ async function loginToProvider(
     headless: false, // Always headed for login
     url: provider.config.loginUrl,
     profileMode,
+    profile,
     persistent: true, // Login needs persistent context to auto-save cookies
   });
 
   try {
+    // Anti-bot providers can close when probed during login. Just hold the
+    // window open; cookies persist in the profile. Close it manually when done.
+    if (provider.config.headlessBlocked) {
+      const timeoutMs = 10 * 60 * 1000;
+      console.log(chalk.dim('Anti-bot login: not probing the page; close the window when done.'));
+      await browser.page.waitForTimeout(timeoutMs).catch(() => {});
+      return;
+    }
+
     // Wait for the user to login — poll until logged in or timeout
     const timeoutMs = 5 * 60 * 1000; // 5 minutes to login
     const startTime = Date.now();
+    let cloudflareNoted = false;
 
     while (Date.now() - startTime < timeoutMs) {
-      const loggedIn = await provider.actions.isLoggedIn(browser.page);
-      if (loggedIn) {
-        console.log(chalk.green(`✓ Logged in to ${provider.config.displayName}`));
-        return;
+      try {
+        const loggedIn = await provider.actions.isLoggedIn(browser.page);
+        if (loggedIn) {
+          console.log(chalk.green(`✓ Logged in to ${provider.config.displayName}`));
+          return;
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (message.includes('Cloudflare bot-protection is blocking the browser')) {
+          if (!cloudflareNoted) {
+            cloudflareNoted = true;
+            console.log(
+              chalk.yellow(
+                'Cloudflare challenge detected. Please complete it manually, then continue signing in.',
+              ),
+            );
+            console.log(
+              chalk.dim('Window will keep retrying for up to 5 minutes while you finish login.'),
+            );
+          }
+          await browser.page.waitForTimeout(2000);
+          continue;
+        }
+        throw error;
       }
       await browser.page.waitForTimeout(2000);
     }
@@ -121,6 +164,7 @@ async function loginToProvider(
 async function loginAllWithTabs(
   providers: ProviderName[],
   _profileMode: ProfileMode = 'shared',
+  profile?: string,
 ): Promise<void> {
   console.log(chalk.blue(`Opening ${providers.length} providers as tabs in one browser window...`));
   console.log(chalk.dim('Login to each tab. Window will close automatically when all are done.\n'));
@@ -131,7 +175,7 @@ async function loginAllWithTabs(
     '--no-default-browser-check',
   ];
 
-  const profileDir = getSharedProfileDir();
+  const profileDir = profile ? getIsolatedProfileDir(profile) : getSharedProfileDir();
   await mkdir(profileDir, { recursive: true });
   const lock = await acquireProfileLock(profileDir);
 
@@ -213,6 +257,7 @@ async function loginAllWithTabs(
 async function checkLoginStatus(
   profileMode: ProfileMode = 'shared',
   configHeadless = true,
+  profile?: string,
 ): Promise<void> {
   console.log(chalk.bold('Login Status\n'));
   if (profileMode === 'shared') {
@@ -227,6 +272,7 @@ async function checkLoginStatus(
         headless: resolveHeadlessMode(name, configHeadless),
         url: provider.config.url,
         profileMode,
+        profile,
       });
 
       try {

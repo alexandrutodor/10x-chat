@@ -66,4 +66,8 @@ describe('Paths', () => {
       path.join(os.homedir(), '.10x-chat', 'profiles', 'gemini'),
     );
   });
+
+  it('should reject unsafe profile names', () => {
+    expect(() => getIsolatedProfileDir('../gemini')).toThrow(/Profile name/);
+  });
 });

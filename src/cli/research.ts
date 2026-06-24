@@ -18,6 +18,7 @@ export function createResearchCommand(): Command {
     .option('--timeout <ms>', 'Total timeout in milliseconds', '600000')
     .option('--poll-interval <ms>', 'Progress check interval in milliseconds', '5000')
     .option('--save-dir <dir>', 'Directory to save the research report')
+    .option('--profile <name>', 'Use named browser profile')
     .option('--isolated-profile', 'Use per-provider browser profiles')
     .action(async (options) => {
       const provider = (options.provider as string) ?? 'gemini';
@@ -56,6 +57,7 @@ export function createResearchCommand(): Command {
           model: options.model,
           saveDir: options.saveDir,
           isolatedProfile: options.isolatedProfile,
+          profile: options.profile,
         });
 
         renderResearchResult(result);

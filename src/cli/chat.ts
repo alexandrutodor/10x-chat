@@ -19,8 +19,10 @@ export function createChatCommand(): Command {
     .option('--copy', 'Copy the bundle to clipboard instead of sending')
     .option('--dry-run', 'Preview the bundle without sending')
     .option('--headed', 'Show browser window during chat')
+    .option('--headless', 'Force headless browser even for providers that prefer headed')
     .option('--timeout <ms>', 'Response timeout in milliseconds', '300000')
     .option('--save-images <dir>', 'Save generated images to directory')
+    .option('--profile <name>', 'Use named browser profile')
     .option('--isolated-profile', 'Use per-provider browser profiles (backward compat)')
     .action(async (options) => {
       const provider = options.provider as string | undefined;
@@ -30,6 +32,10 @@ export function createChatCommand(): Command {
       }
       if (options.all && provider) {
         console.error(chalk.red('Cannot use --all and --provider together. Pick one.'));
+        process.exit(1);
+      }
+      if (options.headed && options.headless) {
+        console.error(chalk.red('Cannot use --headed and --headless together.'));
         process.exit(1);
       }
 
@@ -44,8 +50,10 @@ export function createChatCommand(): Command {
         file: options.file,
         attach: options.attach,
         headed: options.headed,
+        headless: options.headless,
         saveImages: options.saveImages,
         isolatedProfile: options.isolatedProfile,
+        profile: options.profile,
         timeoutMs,
       };
 

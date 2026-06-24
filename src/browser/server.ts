@@ -286,8 +286,10 @@ async function handleRpc(body: RpcRequest): Promise<RpcResponse> {
       }
 
       const context = await browser.newContext((args[0] as Record<string, unknown>) ?? {});
-      // Inject stealth patches into every page created in this context
-      await context.addInitScript(STEALTH_INIT_SCRIPT);
+      // CloakBrowser is patched at the binary level; extra JS stealth makes it noisier.
+      if (getEngineName() !== 'cloakbrowser') {
+        await context.addInitScript(STEALTH_INIT_SCRIPT);
+      }
       const contextId = randomUUID();
       contexts.set(contextId, context);
       return { ok: true, result: toContextHandle(contextId) };

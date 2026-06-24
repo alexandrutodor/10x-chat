@@ -127,7 +127,7 @@ Deep research via ChatGPT, Gemini, or Perplexity with non-blocking progress poll
 ```bash
 npx 10x-chat@latest research -p "Latest breakthroughs in quantum computing" --provider gemini
 npx 10x-chat@latest research -p "Hard technical research" --provider gemini --model "Deep Think"
-npx 10x-chat@latest research -p "Market analysis of EVs" --provider chatgpt --timeout 600000
+npx 10x-chat@latest research -p "Market analysis of EVs" --provider chatgpt --model "Extra High" --timeout 900000
 npx 10x-chat@latest research -p "Compare React vs Vue in 2026" --provider perplexity --save-dir ./reports
 ```
 
@@ -140,6 +140,10 @@ npx 10x-chat@latest research -p "Compare React vs Vue in 2026" --provider perple
 | `--timeout <ms>` | Total timeout (default: 600000 / 10 min) |
 | `--poll-interval <ms>` | Progress check interval (default: 5000) |
 | `--save-dir <dir>` | Directory to save the research report |
+
+#### ChatGPT Deep Research
+
+ChatGPT Deep Research is selected from the composer `+` (`Add files and more`) menu, then verified by the active `Deep research` pill before the prompt is submitted. Model/thinking level is selected separately from the composer model pill (`Instant`, `Medium`, `High`, `Extra High`, `Pro Extended`, `GPT-5.5`). See [`docs/chatgpt-deep-research.md`](docs/chatgpt-deep-research.md).
 
 ### `video`
 

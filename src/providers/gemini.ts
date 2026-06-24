@@ -13,7 +13,7 @@ export const GEMINI_CONFIG: ProviderConfig = {
   displayName: 'Gemini',
   url: 'https://gemini.google.com/app',
   loginUrl: 'https://gemini.google.com/app',
-  models: ['3.1 Flash-Lite', '3.5 Flash', '3.1 Pro', 'Deep Think', 'Pro'],
+  models: ['3.1 Flash-Lite', '3.5 Flash', '3.1 Pro', 'Deep Think', 'Deep Research', 'Pro'],
   defaultModel: '3.5 Flash',
   defaultTimeoutMs: 5 * 60 * 1000,
 };
@@ -29,6 +29,7 @@ function resolveGeminiModeLabel(model: string): string {
   const normalized = normalizeGeminiModeLabel(model);
   if (normalized === 'fast') return '3.1 Flash-Lite';
   if (normalized === 'thinking') return '3.5 Flash';
+  if (normalized === 'research') return 'Deep Research';
   if (normalized === 'pro') return '3.1 Pro';
   return model;
 }
@@ -40,43 +41,123 @@ function geminiModeTestId(model: string): string {
 
 async function clickGeminiMenuOption(page: Page, label: string): Promise<boolean> {
   const target = normalizeGeminiModeLabel(label);
-  return page.evaluate((targetLabel: string) => {
-    const overlay = document.querySelector('.cdk-overlay-container') ?? document.body;
 
-    const candidates = (
-      Array.from(
-        overlay.querySelectorAll(
-          'button,[role="menuitem"],[role="menuitemcheckbox"],[role="option"],mat-option,gem-menu-item,toolbox-drawer-item',
-        ),
-      ) as HTMLElement[]
-    ).sort((a, b) => {
-      const aInteractive = a.tagName === 'BUTTON' || !!a.getAttribute('role');
-      const bInteractive = b.tagName === 'BUTTON' || !!b.getAttribute('role');
-      return Number(bInteractive) - Number(aInteractive);
-    });
-    for (const el of candidates) {
-      const visible = el.offsetWidth > 0 && el.offsetHeight > 0;
-      if (!visible) continue;
-      const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
-      const aria = (el.getAttribute('aria-label') ?? '').toLowerCase();
-      const normalized = `${text} ${aria}`.replace(/[^a-z0-9]+/g, ' ').trim();
-      if (
-        normalized === targetLabel ||
-        normalized.startsWith(`${targetLabel} `) ||
-        normalized.includes(targetLabel)
-      ) {
-        const clickTarget =
-          el.tagName === 'BUTTON' || el.getAttribute('role')
-            ? el
-            : ((el.querySelector(
-                'button,[role="menuitem"],[role="menuitemcheckbox"]',
-              ) as HTMLElement | null) ?? el);
-        clickTarget.click();
-        return true;
+  const clickMatchingOption = () =>
+    page.evaluate((targetLabel: string) => {
+      const overlay = document.querySelector('.cdk-overlay-container') ?? document.body;
+
+      const candidates = (
+        Array.from(
+          overlay.querySelectorAll(
+            'button,[role="menuitem"],[role="menuitemcheckbox"],[role="option"],mat-option,gem-menu-item,toolbox-drawer-item',
+          ),
+        ) as HTMLElement[]
+      ).sort((a, b) => {
+        const aInteractive = a.tagName === 'BUTTON' || !!a.getAttribute('role');
+        const bInteractive = b.tagName === 'BUTTON' || !!b.getAttribute('role');
+        return Number(bInteractive) - Number(aInteractive);
+      });
+      for (const el of candidates) {
+        const visible = el.offsetWidth > 0 && el.offsetHeight > 0;
+        if (!visible) continue;
+        const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+        const aria = (el.getAttribute('aria-label') ?? '').toLowerCase();
+        const normalized = `${text} ${aria}`.replace(/[^a-z0-9]+/g, ' ').trim();
+        if (
+          normalized === targetLabel ||
+          normalized.startsWith(`${targetLabel} `) ||
+          normalized.includes(targetLabel)
+        ) {
+          const clickTarget =
+            el.tagName === 'BUTTON' || el.getAttribute('role')
+              ? el
+              : ((el.querySelector(
+                  'button,[role="menuitem"],[role="menuitemcheckbox"]',
+                ) as HTMLElement | null) ?? el);
+          clickTarget.scrollIntoView({ block: 'center' });
+          clickTarget.click();
+          return true;
+        }
+      }
+      return false;
+    }, target);
+
+  let openedMoreTools = false;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    if (await clickMatchingOption()) return true;
+
+    if (!openedMoreTools) {
+      openedMoreTools = await page.evaluate(() => {
+        const root = document.querySelector('.cdk-overlay-container') ?? document.body;
+        const visible = (el: Element): el is HTMLElement => {
+          if (!(el instanceof HTMLElement)) return false;
+          const rect = el.getBoundingClientRect();
+          const style = getComputedStyle(el);
+          return rect.width > 0 && rect.height > 0 && style.display !== 'none';
+        };
+        const button = Array.from(
+          root.querySelectorAll('button,[role="menuitem"],toolbox-drawer-item'),
+        ).find((el) => {
+          const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+          const aria = (el.getAttribute('aria-label') ?? '').toLowerCase();
+          const testId = (el.getAttribute('data-test-id') ?? '').toLowerCase();
+          return (
+            visible(el) &&
+            (text === 'more tools' || aria === 'more tools' || testId === 'more-tools-button')
+          );
+        });
+        if (button instanceof HTMLElement) button.click();
+        return Boolean(button);
+      });
+      if (openedMoreTools) {
+        await page.waitForTimeout(500);
+        continue;
       }
     }
-    return false;
-  }, target);
+
+    const menuBox = await page.evaluate(() => {
+      const root = document.querySelector('.cdk-overlay-container') ?? document.body;
+      const preferred = Array.from(
+        root.querySelectorAll(
+          '.toolbox-drawer-simplified-more-menu-card,.toolbox-drawer-more-menu-card,.toolbox-drawer-card.scrollable-menu,.mat-mdc-menu-panel',
+        ),
+      ).filter((el) => el instanceof HTMLElement) as HTMLElement[];
+      const allScrollables = Array.from(root.querySelectorAll('*')).filter((el) => {
+        if (!(el instanceof HTMLElement)) return false;
+        const style = getComputedStyle(el);
+        return (
+          el.scrollHeight > el.clientHeight + 4 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden'
+        );
+      }) as HTMLElement[];
+      const scrollables = preferred.length > 0 ? preferred : allScrollables;
+      for (const el of scrollables) {
+        el.scrollTop += 240;
+      }
+      const pane =
+        scrollables.at(0) ??
+        (root.querySelector('.cdk-overlay-pane') as HTMLElement | null) ??
+        (root.querySelector('mat-card,mat-action-list,toolbox-drawer') as HTMLElement | null);
+      const rect = pane?.getBoundingClientRect();
+      return rect
+        ? {
+            x: rect.left + rect.width / 2,
+            y: Math.min(rect.bottom - 10, Math.max(rect.top + 10, window.innerHeight - 80)),
+            scrolled: scrollables.length > 0,
+          }
+        : { x: window.innerWidth / 2, y: window.innerHeight / 2, scrolled: false };
+    });
+
+    if (!menuBox.scrolled) {
+      // Gemini's toolbox can clip items in the CDK overlay; real wheel input wakes it up.
+      await page.mouse.move(menuBox.x, menuBox.y);
+      await page.mouse.wheel(0, 360);
+    }
+    await page.waitForTimeout(250);
+  }
+
+  return clickMatchingOption();
 }
 
 async function getVisibleGeminiMenuLabels(page: Page): Promise<string> {

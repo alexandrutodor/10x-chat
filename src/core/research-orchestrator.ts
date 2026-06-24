@@ -48,15 +48,43 @@ const geminiResearch: ResearchProviderConfig = {
     }
 
     // Ultra accounts may expose Deep Research from the Gemini Tools menu.
-    await activateGeminiTool(page, 'Deep Research');
-    // If not visible, Gemini may auto-route to deep research based on prompt
+    const activated = await activateGeminiTool(page, 'Deep Research');
+    if (!activated) {
+      const available = await page.evaluate(() => {
+        const root = document.querySelector('.cdk-overlay-container') ?? document.body;
+        return Array.from(
+          root.querySelectorAll(
+            'button,[role="menuitem"],[role="option"],toolbox-drawer-item,gem-menu-item',
+          ),
+        )
+          .map((el) => (el.textContent ?? '').replace(/\s+/g, ' ').trim())
+          .filter(Boolean)
+          .filter((label, index, all) => all.indexOf(label) === index)
+          .slice(0, 20)
+          .join(', ');
+      });
+      throw new Error(
+        `Gemini Deep Research is not rendered in this profile${available ? ` (available: ${available})` : ''}. Use a profile/account where the Deep Research tool is visible.`,
+      );
+    }
   },
   progressSelector: '.research-progress, .thinking-indicator, model-response [class*="progress"]',
   async getProgress(page: Page) {
-    const el = page
-      .locator('.research-progress, .thinking-indicator, model-response [class*="progress"]')
-      .first();
-    return (await el.textContent().catch(() => '')) ?? '';
+    const progress =
+      (await page
+        .locator('.research-progress, .thinking-indicator, model-response [class*="progress"]')
+        .first()
+        .textContent()
+        .catch(() => '')) ?? '';
+    if (progress.trim()) return progress.trim();
+
+    // Gemini may answer normally when Deep Research is unavailable; use the response text
+    // so the research command can finish instead of waiting for the full timeout.
+    return page
+      .locator('model-response .model-response-text, model-response message-content')
+      .last()
+      .evaluate((el) => ((el as HTMLElement).innerText || el.textContent || '').trim())
+      .catch(() => '');
   },
   async isResearching(page: Page) {
     // Check for active research indicators
@@ -82,7 +110,11 @@ const geminiResearch: ResearchProviderConfig = {
     const responseTurn = page
       .locator('model-response .model-response-text, model-response message-content')
       .last();
-    return (await responseTurn.textContent().catch(() => ''))?.trim() ?? '';
+    return (
+      (await responseTurn
+        .evaluate((el) => ((el as HTMLElement).innerText || el.textContent || '').trim())
+        .catch(() => '')) ?? ''
+    );
   },
   async getReportHtml(page: Page) {
     const responseTurn = page
@@ -92,35 +124,231 @@ const geminiResearch: ResearchProviderConfig = {
   },
 };
 
-const chatgptResearch: ResearchProviderConfig = {
-  async activateResearch(page: Page) {
-    // ChatGPT deep research: prefer the sidebar entry, but the current UI may expose
-    // research only through the /deep-research route/composer footer.
-    const sidebarLink = page.locator('[data-testid="deep-research-sidebar-item"]').first();
-    if (await sidebarLink.isVisible().catch(() => false)) {
-      await sidebarLink.click();
-      await page.waitForTimeout(3000);
-    } else if (!page.url().includes('/deep-research')) {
-      await page.goto('https://chatgpt.com/deep-research', { waitUntil: 'domcontentloaded' });
-      await page.waitForTimeout(3000);
-    }
+async function isChatGPTDeepResearchActive(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const visible = (el: Element | null): el is HTMLElement => {
+      if (!(el instanceof HTMLElement)) return false;
+      const rect = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== 'none' &&
+        style.visibility !== 'hidden'
+      );
+    };
+    const composer = document
+      .querySelector(
+        '#prompt-textarea,[data-testid="composer-input"],div[contenteditable="true"],textarea',
+      )
+      ?.closest('form');
+    const scopes = [
+      document.querySelector('[data-testid="composer-footer-actions"]'),
+      composer,
+    ].filter((el): el is Element => Boolean(el));
+    return scopes.some((scope) =>
+      Array.from(scope.querySelectorAll('button,[role="button"],[aria-label],[data-testid]')).some(
+        (el) =>
+          visible(el) &&
+          /deep\s+research/i.test(
+            `${el.textContent ?? ''} ${el.getAttribute('aria-label') ?? ''} ${el.getAttribute('data-testid') ?? ''}`,
+          ),
+      ),
+    );
+  });
+}
 
-    // Verify deep research mode is active (chip in composer footer). The chip is
-    // often rendered as plain text inside composer-footer-actions, not an aria label.
-    const active = await page
+async function activateChatGPTDeepResearchFromComposer(page: Page): Promise<boolean> {
+  if (await isChatGPTDeepResearchActive(page)) return true;
+
+  const plusButton = page
+    .locator(
+      '[data-testid="composer-plus-btn"], button[aria-label="Add files and more"], button[aria-label*="Add files" i], button[aria-label*="attach" i]',
+    )
+    .first();
+  let opened = false;
+  const menuVisible = async () =>
+    page
       .locator(
-        '[aria-label*="Deep research"], [data-testid="composer-footer-actions"]:has-text("Deep research")',
+        '[role="menu"]:has-text("Deep research"), [data-radix-popper-content-wrapper]:has-text("Deep research")',
       )
       .first()
       .isVisible()
       .catch(() => false);
-    if (!active) {
-      const url = page.url();
-      const bodyPreview = await page.evaluate(
-        () => document.body.textContent?.replace(/\s+/g, ' ').slice(0, 300) ?? '',
+
+  for (let attempt = 0; attempt < 3 && !opened; attempt++) {
+    await plusButton.click({ force: true, timeout: 5_000 }).catch(() => {});
+    await page.waitForTimeout(500);
+    opened = await menuVisible();
+    if (opened) break;
+
+    const box = await plusButton.boundingBox().catch(() => null);
+    if (box) {
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2).catch(() => {});
+      await page.mouse.down().catch(() => {});
+      await page.waitForTimeout(80);
+      await page.mouse.up().catch(() => {});
+      await page.waitForTimeout(500);
+      opened = await menuVisible();
+    }
+  }
+
+  if (!opened) {
+    opened = await page.evaluate(() => {
+      const visible = (el: Element | null): el is HTMLElement => {
+        if (!(el instanceof HTMLElement)) return false;
+        const rect = el.getBoundingClientRect();
+        const style = getComputedStyle(el);
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden'
+        );
+      };
+      const composer = document.querySelector(
+        '#prompt-textarea,[data-testid="composer-input"],div[contenteditable="true"],textarea',
       );
+      const composerRect =
+        composer instanceof HTMLElement ? composer.getBoundingClientRect() : null;
+      const buttons = Array.from(document.querySelectorAll('button,[role="button"]')).filter(
+        visible,
+      );
+      const nearComposer = (el: HTMLElement) => {
+        if (!composerRect) return true;
+        const rect = el.getBoundingClientRect();
+        return Math.abs(rect.top - composerRect.top) < 180 && rect.right < composerRect.right + 260;
+      };
+      const scored = buttons
+        .map((el) => {
+          const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+          const aria = el.getAttribute('aria-label') ?? '';
+          const testId = el.getAttribute('data-testid') ?? '';
+          const haystack = `${text} ${aria} ${testId}`;
+          const score = /add photos and files|attach|upload|tool|^\+$|add/i.test(haystack) ? 0 : 1;
+          const distance = composerRect
+            ? Math.abs(el.getBoundingClientRect().top - composerRect.top)
+            : 0;
+          return { el, score, distance, near: nearComposer(el) };
+        })
+        .filter((x) => x.near)
+        .sort((a, b) => a.score - b.score || a.distance - b.distance);
+      const target = scored[0]?.el;
+      target?.click();
+      return Boolean(target);
+    });
+  }
+  if (!opened) return false;
+  await page.waitForTimeout(700);
+
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const deepOption = page
+      .locator(
+        '[role="menuitemradio"]:has-text("Deep research"), [role="menuitem"]:has-text("Deep research"), [role="option"]:has-text("Deep research"), button:has-text("Deep research"), [role="button"]:has-text("Deep research")',
+      )
+      .first();
+    const clicked = await deepOption
+      .click({ force: true, timeout: 1_000 })
+      .then(() => true)
+      .catch(async () =>
+        page.evaluate(() => {
+          const visible = (el: Element | null): el is HTMLElement => {
+            if (!(el instanceof HTMLElement)) return false;
+            const rect = el.getBoundingClientRect();
+            const style = getComputedStyle(el);
+            return (
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style.display !== 'none' &&
+              style.visibility !== 'hidden'
+            );
+          };
+          const scopes = Array.from(
+            document.querySelectorAll(
+              '[role="menu"],[role="listbox"],[data-radix-popper-content-wrapper],[data-headlessui-portal],[data-floating-ui-portal],[role="dialog"]',
+            ),
+          );
+          const roots = scopes.length ? scopes : [document.body];
+          for (const root of roots) {
+            const candidates = Array.from(
+              root.querySelectorAll(
+                'button,[role="menuitemradio"],[role="menuitem"],[role="option"],[role="button"],a',
+              ),
+            );
+            for (const el of candidates) {
+              if (!visible(el)) continue;
+              const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+              const aria = el.getAttribute('aria-label') ?? '';
+              const testId = el.getAttribute('data-testid') ?? '';
+              if (!/deep\s+research/i.test(`${text} ${aria} ${testId}`)) continue;
+              (el as HTMLElement).scrollIntoView({ block: 'center', inline: 'center' });
+              (el as HTMLElement).click();
+              return true;
+            }
+          }
+          return false;
+        }),
+      );
+    if (clicked) {
+      await page.waitForTimeout(1_000);
+      return true;
+    }
+
+    const scrolled = await page.evaluate(() => {
+      const roots = Array.from(
+        document.querySelectorAll(
+          '[role="menu"],[role="listbox"],[data-radix-popper-content-wrapper],[data-headlessui-portal],[data-floating-ui-portal],[role="dialog"]',
+        ),
+      ).filter((el): el is HTMLElement => el instanceof HTMLElement);
+      const scrollables = roots.flatMap((root) =>
+        Array.from(root.querySelectorAll('*')).filter((el): el is HTMLElement => {
+          if (!(el instanceof HTMLElement)) return false;
+          const style = getComputedStyle(el);
+          return el.scrollHeight > el.clientHeight + 4 && style.display !== 'none';
+        }),
+      );
+      for (const el of scrollables) el.scrollTop += 320;
+      return scrollables.length > 0;
+    });
+    if (!scrolled) await page.mouse.wheel(0, 320).catch(() => {});
+    await page.waitForTimeout(250);
+  }
+  return false;
+}
+
+const chatgptResearch: ResearchProviderConfig = {
+  async activateResearch(page: Page) {
+    // ChatGPT exposes Deep Research from the composer + menu, not reliably via /deep-research.
+    const active = await activateChatGPTDeepResearchFromComposer(page);
+    if (!active || !(await isChatGPTDeepResearchActive(page))) {
+      const labels = await page.evaluate(() => {
+        const visible = (el: Element | null): el is HTMLElement => {
+          if (!(el instanceof HTMLElement)) return false;
+          const rect = el.getBoundingClientRect();
+          const style = getComputedStyle(el);
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== 'none' &&
+            style.visibility !== 'hidden'
+          );
+        };
+        return Array.from(
+          document.querySelectorAll(
+            '[role="menu"] button,[role="menuitem"],[role="option"],[data-radix-popper-content-wrapper] button,[data-headlessui-portal] button,[data-floating-ui-portal] button,[role="dialog"] button,button',
+          ),
+        )
+          .filter(visible)
+          .map((el) =>
+            (el.textContent ?? el.getAttribute('aria-label') ?? '').replace(/\s+/g, ' ').trim(),
+          )
+          .filter(Boolean)
+          .filter((label, index, all) => all.indexOf(label) === index)
+          .slice(0, 30)
+          .join(', ');
+      });
       throw new Error(
-        `ChatGPT Deep Research mode was not detected after activation (url: ${url}). ${bodyPreview}`,
+        `ChatGPT Deep Research mode was not detected from the composer + menu${labels ? ` (visible: ${labels})` : ''}.`,
       );
     }
     console.log('  Deep research mode active');
@@ -282,7 +510,7 @@ export async function runResearch(options: ResearchOptions): Promise<ResearchRes
   const timeoutMs = options.timeoutMs ?? 600_000; // 10 minutes default
   const pollIntervalMs = options.pollIntervalMs ?? 5_000;
   const headless = resolveHeadlessMode(providerName, config.headless, options.headed === true);
-  const profileMode = options.isolatedProfile ? 'isolated' : config.profileMode;
+  const profileMode = options.profile || options.isolatedProfile ? 'isolated' : config.profileMode;
 
   // Create session
   const session = await createSession(providerName, options.prompt, options.model);
@@ -302,6 +530,7 @@ export async function runResearch(options: ResearchOptions): Promise<ResearchRes
       headless,
       url: provider.config.url,
       profileMode,
+      profile: options.profile,
     });
   } catch (error) {
     await updateSession(session.id, { status: 'failed' });

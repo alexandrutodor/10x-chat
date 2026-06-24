@@ -17,4 +17,8 @@ describe('resolveHeadlessMode', () => {
   it('honors explicit headed override for any provider', () => {
     expect(resolveHeadlessMode('grok', true, true)).toBe(false);
   });
+
+  it('honors explicit headless override for providers that prefer headed', () => {
+    expect(resolveHeadlessMode('chatgpt', true, false, true)).toBe(true);
+  });
 });

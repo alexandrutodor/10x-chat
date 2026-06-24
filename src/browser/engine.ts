@@ -1,12 +1,12 @@
 /**
  * Browser engine abstraction.
  *
- * Tries to use Patchright (undetectable Playwright fork) first,
- * falls back to Playwright if Patchright is not installed.
+ * Tries to use CloakBrowser first, then Patchright,
+ * then falls back to Playwright if neither stealth engine is installed.
  *
- * Patchright patches CDP-level automation detection signals that
- * Playwright leaks (e.g. Runtime.enable), making the browser
- * virtually undetectable by Cloudflare, DataDome, etc.
+ * CloakBrowser/Patchright reduce automation detection signals that
+ * Playwright leaks, making browser automation less likely to trip
+ * Cloudflare, DataDome, etc.
  *
  * Both libraries export the same API surface — this module
  * re-exports `chromium` from whichever is available.
@@ -15,13 +15,40 @@
 import type { BrowserType } from 'playwright';
 
 let _chromium: BrowserType | undefined;
-let _engineName: 'patchright' | 'playwright' | 'unknown' = 'unknown';
+let _engineName: 'cloakbrowser' | 'patchright' | 'playwright' | 'unknown' = 'unknown';
 let _loaded = false;
 
 async function loadEngine(): Promise<BrowserType> {
   if (_chromium) return _chromium;
 
-  // Try Patchright first (drop-in Playwright replacement with stealth)
+  // Try CloakBrowser first. It exposes launch helpers, not a BrowserType, so
+  // adapt only the two methods 10x-chat uses.
+  try {
+    const cloakbrowser = await import('cloakbrowser');
+    const humanize = process.env.TEN_X_CHAT_CLOAK_HUMANIZE !== '0';
+    const cleanOptions = (options?: Record<string, unknown>) => {
+      const { channel: _channel, args: _args, ...rest } = options ?? {};
+      return rest;
+    };
+    _chromium = {
+      launch: async (options?: Record<string, unknown>) => {
+        return cloakbrowser.launch({ ...cleanOptions(options), humanize });
+      },
+      launchPersistentContext: async (userDataDir: string, options?: Record<string, unknown>) => {
+        return cloakbrowser.launchPersistentContext({
+          userDataDir,
+          ...cleanOptions(options),
+          humanize,
+        });
+      },
+    } as unknown as BrowserType;
+    _engineName = 'cloakbrowser';
+    _loaded = true;
+    return _chromium;
+  } catch {
+    // CloakBrowser not installed or broken — try Patchright
+  }
+
   try {
     const patchright = await import('patchright');
     if (patchright.chromium) {
@@ -42,7 +69,7 @@ async function loadEngine(): Promise<BrowserType> {
     return _chromium;
   } catch {
     throw new Error(
-      'Neither patchright nor playwright is installed. Run: npm install patchright (recommended) or npm install playwright',
+      'No browser engine is installed. Run: npm install cloakbrowser playwright-core (recommended), patchright, or playwright',
     );
   }
 }
@@ -53,7 +80,7 @@ export async function getChromium(): Promise<BrowserType> {
 }
 
 /** Which engine is active. Returns 'unknown' if not yet loaded. */
-export function getEngineName(): 'patchright' | 'playwright' | 'unknown' {
+export function getEngineName(): 'cloakbrowser' | 'patchright' | 'playwright' | 'unknown' {
   return _engineName;
 }
 

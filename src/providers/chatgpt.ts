@@ -1,12 +1,17 @@
 import type { Page } from 'playwright';
-import { pollUntilStable } from '../core/polling.js';
 import type {
   CapturedResponse,
   GeneratedImage,
   ProviderActions,
   ProviderConfig,
 } from '../types.js';
-import { submitPromptToComposer } from './submit.js';
+import { clickSendButton, submitPromptToComposer } from './submit.js';
+
+const chatgptSubmitBaseline = new WeakMap<
+  Page,
+  { turnCount: number; latestText: string; url: string }
+>();
+const chatgptPendingFiles = new WeakMap<Page, string[]>();
 
 const ASSISTANT_TURN_FALLBACK_SELECTORS = [
   'div.agent-turn',
@@ -39,13 +44,23 @@ export const CHATGPT_CONFIG: ProviderConfig = {
   displayName: 'ChatGPT',
   url: 'https://chatgpt.com',
   loginUrl: 'https://chatgpt.com/auth/login',
-  models: ['Instant', 'Thinking'],
-  defaultModel: 'Thinking',
+  models: ['Instant', 'Medium', 'High', 'Extra High', 'Pro Extended', 'Thinking', 'GPT-5.5'],
+  defaultModel: 'Pro Extended',
   defaultTimeoutMs: 5 * 60 * 1000,
   // ChatGPT's Cloudflare bot-protection blocks headless Playwright permanently.
   // The chat orchestrator will automatically force headed mode for this provider.
   headlessBlocked: true,
 };
+
+function resolveChatGPTModelLabel(model: string): string {
+  const normalized = normalizeModelLabel(model);
+  if (normalized === 'thinking' || normalized === 'pro') return 'Pro Extended';
+  if (normalized === 'xhigh' || normalized === 'extra high') return 'Extra High';
+  if (normalized === 'medium') return 'Medium';
+  if (normalized === 'high') return 'High';
+  if (normalized === 'instant') return 'Instant';
+  return model;
+}
 
 const SELECTORS = {
   composer:
@@ -58,12 +73,13 @@ const SELECTORS = {
   /** Hidden file input — exclude the dedicated photo/camera inputs */
   fileInput: 'input[type="file"]:not(#upload-photos):not(#upload-camera)',
   modelPicker:
-    'button[data-testid="model-switcher-dropdown-button"], button[aria-label="Model selector"], button[aria-label*="model" i], button[aria-haspopup="menu"], button[aria-haspopup="listbox"], button[aria-haspopup="dialog"]',
-  modelOption: '[role="menuitem"]',
+    'button.__composer-pill, button[data-testid="model-switcher-dropdown-button"], button[aria-label="Model selector"], button[aria-label*="model" i], button[aria-haspopup="menu"], button[aria-haspopup="listbox"], button[aria-haspopup="dialog"]',
+  modelOption: 'button,[role="menuitemradio"],[role="menuitem"],[role="option"]',
 } as const;
 
 const MODEL_OPTION_SCOPE_SELECTORS = [
   '[role="menu"]',
+  '[data-radix-menu-content]',
   '[role="listbox"]',
   '[data-radix-popper-content-wrapper]',
   '[data-headlessui-portal]',
@@ -149,7 +165,7 @@ async function getVisibleModelPickerState(page: Page): Promise<{ found: boolean;
         return { found: true, text: normalizeText(explicitPicker.textContent) };
       }
 
-      const pickerTextRe = /instant|thinking|gpt|model/i;
+      const pickerTextRe = /instant|thinking|gpt|model|pro|medium|high|extended/i;
       const candidate = Array.from(document.querySelectorAll(candidateSelector)).find((element) => {
         return (
           isVisible(element) &&
@@ -344,23 +360,43 @@ export class CloudflareBlockedError extends Error {
 export const chatgptActions: ProviderActions = {
   async selectModel(page: Page, model: string): Promise<void> {
     await dismissOverlays(page);
+    const targetModel = resolveChatGPTModelLabel(model);
 
+    await page
+      .locator(SELECTORS.modelPicker)
+      .first()
+      .waitFor({ state: 'visible', timeout: 15_000 })
+      .catch(() => {});
+    await page.waitForTimeout(500);
     const picker = await getVisibleModelPickerState(page);
     if (!picker.found) {
-      console.warn(`ChatGPT model picker not found — skipping model selection for "${model}"`);
+      console.warn(
+        `ChatGPT model picker not found — skipping model selection for "${targetModel}"`,
+      );
       return;
     }
 
-    if (normalizeModelLabel(picker.text) === normalizeModelLabel(model)) {
+    if (normalizeModelLabel(picker.text) === normalizeModelLabel(targetModel)) {
       return;
     }
 
-    await page.locator('button[data-testid="model-switcher-dropdown-button"]').first().click();
+    const pickerClicked = await page.evaluate((sel: string) => {
+      const visible = (el: Element): el is HTMLElement => {
+        if (!(el instanceof HTMLElement)) return false;
+        const rect = el.getBoundingClientRect();
+        const style = getComputedStyle(el);
+        return rect.width > 0 && rect.height > 0 && style.display !== 'none';
+      };
+      const button = Array.from(document.querySelectorAll(sel)).find(visible);
+      button?.click();
+      return Boolean(button);
+    }, SELECTORS.modelPicker);
+    if (!pickerClicked) return;
     await page.waitForTimeout(750);
 
-    const optionClicked = await clickVisibleModelOption(page, model);
+    const optionClicked = await clickVisibleModelOption(page, targetModel);
     if (!optionClicked) {
-      console.warn(`Model "${model}" not found in ChatGPT picker — using current model`);
+      console.warn(`Model "${targetModel}" not found in ChatGPT picker — using current model`);
       await page.keyboard.press('Escape').catch(() => {});
       return;
     }
@@ -424,20 +460,34 @@ export const chatgptActions: ProviderActions = {
   },
 
   async attachFiles(page: Page, filePaths: string[]): Promise<void> {
-    const fileInput = page.locator(SELECTORS.fileInput).first();
-    await fileInput.setInputFiles(filePaths);
-    // Wait for upload indicators to appear and settle
-    await page.waitForTimeout(2000);
+    // Upload after text entry; clearing ProseMirror before typing can delete attachment chips.
+    chatgptPendingFiles.set(page, filePaths);
   },
 
   async submitPrompt(page: Page, prompt: string): Promise<void> {
     // Dismiss onboarding/welcome modals that block the composer
     await dismissOverlays(page);
+    chatgptSubmitBaseline.set(page, {
+      turnCount: await getAssistantTurnCount(page),
+      latestText: '',
+      url: page.url(),
+    });
 
+    // ponytail: ChatGPT shows the composer before ProseMirror is actually ready under Xvfb.
+    await page.waitForTimeout(3_000);
+    const pendingFiles = chatgptPendingFiles.get(page) ?? [];
     await submitPromptToComposer(page, prompt, {
       composerSelector: SELECTORS.composer,
       sendButtonSelector: SELECTORS.sendButton,
+      submit: pendingFiles.length === 0,
     });
+
+    if (pendingFiles.length > 0) {
+      await page.locator(SELECTORS.fileInput).first().setInputFiles(pendingFiles);
+      await page.waitForTimeout(5_000);
+      await clickSendButton(page, SELECTORS.sendButton);
+      chatgptPendingFiles.delete(page);
+    }
   },
 
   async captureResponse(
@@ -446,47 +496,56 @@ export const chatgptActions: ProviderActions = {
   ): Promise<CapturedResponse> {
     const { timeoutMs, onChunk } = opts;
     const startTime = Date.now();
-    const initialUrl = page.url();
-
-    // ChatGPT navigates from / to /c/<id> after sending a new message.
-    // This resets the DOM, so we cannot rely on a fixed nth() index.
-    // Strategy: track initial turn count + URL to detect the new response.
-    const initialTurnCount = await getAssistantTurnCount(page);
-
-    // Phase 1: Wait for a new assistant turn to appear
-    const waitForNewTurn = async (): Promise<void> => {
-      while (Date.now() - startTime < timeoutMs) {
-        const currentUrl = page.url();
-        const currentCount = await getAssistantTurnCount(page);
-
-        // Case 1: URL changed (new conversation) — any turn is "ours"
-        if (currentUrl !== initialUrl && currentCount > 0) return;
-
-        // Case 2: Same URL but turn count increased — new response arrived
-        if (currentUrl === initialUrl && currentCount > initialTurnCount) return;
-
-        await page.waitForTimeout(500);
-      }
-      throw new Error('Timed out waiting for ChatGPT assistant response');
+    const baseline = chatgptSubmitBaseline.get(page) ?? {
+      turnCount: await getAssistantTurnCount(page),
+      latestText: '',
+      url: page.url(),
     };
-    await waitForNewTurn();
 
-    // Phase 2: Poll until the response stops changing and streaming is complete
-    const remainingMs = Math.max(timeoutMs - (Date.now() - startTime), 5_000);
-    const { text: lastText, truncated } = await pollUntilStable(page, {
-      getText: async (p) => {
-        const snapshot = await getLatestAssistantSnapshot(p);
-        return snapshot.text;
-      },
-      timeoutMs: remainingMs,
-      onChunk,
-      isStreaming: async (p) =>
-        p
-          .locator(SELECTORS.stopButton)
-          .first()
-          .isVisible()
-          .catch(() => false),
-    });
+    // ponytail: direct text polling beats ChatGPT's constantly shifting turn DOM.
+    let lastText = baseline.latestText;
+    let emittedText = '';
+    let stableCount = 0;
+    let truncated = true;
+    while (Date.now() - startTime < timeoutMs) {
+      const snapshot = await getLatestAssistantSnapshot(page);
+      const text = snapshot.text;
+      const streaming = await page
+        .locator(SELECTORS.stopButton)
+        .first()
+        .isVisible()
+        .catch(() => false);
+      const placeholder =
+        /^\s*(?:pro\s+)?(?:thinking|reasoning|searching|finalizing answer|listing files in data directory|reading (?:file|document)s?|analyzing|processing)\s*$/i.test(
+          text,
+        );
+
+      if (text && text !== baseline.latestText) {
+        if (text !== emittedText) {
+          onChunk?.(
+            emittedText && text.startsWith(emittedText) ? text.slice(emittedText.length) : text,
+          );
+          emittedText = text;
+        }
+
+        if (text === lastText && !streaming && !placeholder) {
+          stableCount++;
+          if (stableCount >= 3) {
+            truncated = false;
+            break;
+          }
+        } else {
+          stableCount = 0;
+        }
+        lastText = text;
+      }
+
+      await page.waitForTimeout(1000);
+    }
+
+    if (!lastText || lastText === baseline.latestText) {
+      throw new Error('Timed out waiting for ChatGPT assistant response');
+    }
 
     // Extract the final HTML content using page.evaluate instead of locator.textContent/innerHTML.
     // ChatGPT's current UI exposes the nodes, but daemon-proxied locator text extraction can still

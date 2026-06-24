@@ -11,6 +11,7 @@ function createModelPage(evaluateResults: unknown[]) {
       first: ReturnType<typeof vi.fn>;
       click: ReturnType<typeof vi.fn>;
       isVisible: ReturnType<typeof vi.fn>;
+      waitFor: ReturnType<typeof vi.fn>;
     }
   >();
   const locator = vi.fn((selector: string) => {
@@ -18,8 +19,9 @@ function createModelPage(evaluateResults: unknown[]) {
     if (!state) {
       const click = vi.fn(async () => {});
       const isVisible = vi.fn(async () => false);
-      const first = vi.fn(() => ({ click, isVisible }));
-      state = { first, click, isVisible };
+      const waitFor = vi.fn(async () => {});
+      const first = vi.fn(() => ({ click, isVisible, waitFor }));
+      state = { first, click, isVisible, waitFor };
       locatorState.set(selector, state);
     }
     return { first: state.first };
@@ -36,20 +38,12 @@ function createModelPage(evaluateResults: unknown[]) {
 }
 
 describe('Model selection uses Playwright locator clicks to open the menu', () => {
-  it('selects a ChatGPT model after opening the picker through a locator click', async () => {
-    const page = createModelPage([{ found: true, text: 'Thinking' }, true]);
+  it('selects a ChatGPT model through the composer model picker', async () => {
+    const page = createModelPage([{ found: true, text: 'Pro Extended' }, true, true]);
 
     await chatgptActions.selectModel(page as never, 'Instant');
 
-    const modelPicker = page.__locatorState.get(
-      'button[data-testid="model-switcher-dropdown-button"]',
-    );
-    expect(page.locator).toHaveBeenCalledWith(
-      'button[data-testid="model-switcher-dropdown-button"]',
-    );
-    expect(modelPicker?.first).toHaveBeenCalledTimes(1);
-    expect(modelPicker?.click).toHaveBeenCalledTimes(1);
-    expect(page.evaluate).toHaveBeenCalledTimes(2);
+    expect(page.evaluate).toHaveBeenCalledTimes(3);
     expect(page.waitForTimeout).toHaveBeenCalledWith(750);
     expect(page.waitForTimeout).toHaveBeenCalledWith(500);
     expect(page.keyboard.press).not.toHaveBeenCalled();

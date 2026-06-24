@@ -44,6 +44,7 @@ export function createHistoryCommand(): Command {
     .option('--limit <n>', 'Maximum items per provider', '20')
     .option('--headed', 'Show browser window')
     .option('--json', 'Output JSON')
+    .option('--profile <name>', 'Use named browser profile')
     .option('--isolated-profile', 'Use per-provider browser profiles')
     .action(async (options) => {
       const providerOption = String(options.provider ?? 'all');
@@ -68,6 +69,7 @@ export function createHistoryCommand(): Command {
           await listProviderHistory(providerName, {
             headed: options.headed === true,
             isolatedProfile: options.isolatedProfile === true,
+            profile: options.profile,
             limit,
             quiet: options.json === true,
           }),
@@ -85,12 +87,19 @@ export function createHistoryCommand(): Command {
 
 async function listProviderHistory(
   providerName: ProviderName,
-  opts: { headed: boolean; isolatedProfile: boolean; limit: number; quiet: boolean },
+  opts: {
+    headed: boolean;
+    isolatedProfile: boolean;
+    profile?: string;
+    limit: number;
+    quiet: boolean;
+  },
 ): Promise<HistoryResult> {
   const config = await loadConfig();
   const provider = getProvider(providerName);
   const headless = resolveHeadlessMode(providerName, config.headless, opts.headed);
-  const profileMode: ProfileMode = opts.isolatedProfile ? 'isolated' : config.profileMode;
+  const profileMode: ProfileMode =
+    opts.profile || opts.isolatedProfile ? 'isolated' : config.profileMode;
 
   let browser: Awaited<ReturnType<typeof launchBrowser>> | undefined;
   const originalConsoleLog = console.log;
@@ -105,6 +114,7 @@ async function listProviderHistory(
       headless,
       url: provider.config.url,
       profileMode,
+      profile: opts.profile,
     });
 
     const loggedIn = await provider.actions.isLoggedIn(browser.page);
