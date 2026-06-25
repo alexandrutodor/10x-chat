@@ -20,4 +20,7 @@ export const CHROMIUM_ARGS: string[] = [
   '--disable-blink-features=AutomationControlled',
   '--no-first-run',
   '--no-default-browser-check',
+  '--password-store=basic',
+  '--use-mock-keychain',
+  '--disable-features=DeviceBoundSessionCredentials,BoundSessionCredentials',
 ];

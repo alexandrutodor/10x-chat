@@ -27,7 +27,7 @@ async function loadEngine(): Promise<BrowserType> {
     const cloakbrowser = await import('cloakbrowser');
     const humanize = process.env.TEN_X_CHAT_CLOAK_HUMANIZE !== '0';
     const cleanOptions = (options?: Record<string, unknown>) => {
-      const { channel: _channel, args: _args, ...rest } = options ?? {};
+      const { channel: _channel, ...rest } = options ?? {};
       return rest;
     };
     _chromium = {
