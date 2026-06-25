@@ -362,6 +362,30 @@ export const chatgptActions: ProviderActions = {
     await dismissOverlays(page);
     const targetModel = resolveChatGPTModelLabel(model);
 
+    // Current ChatGPT UI shows the thinking/model level as a composer pill near Send.
+    const composerPill = page
+      .locator('button.__composer-pill')
+      .filter({ hasText: /Instant|Medium|High|Extra High|Pro Extended|GPT-5\.5/ })
+      .first();
+    await composerPill.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+    if (await composerPill.isVisible().catch(() => false)) {
+      const current = (await composerPill.textContent().catch(() => '')) ?? '';
+      if (normalizeModelLabel(current) === normalizeModelLabel(targetModel)) return;
+      await composerPill.click({ force: true }).catch(() => {});
+      await page.waitForTimeout(750);
+      const option = page
+        .locator(
+          `[role="menuitemradio"]:has-text("${targetModel}"), [role="menuitem"]:has-text("${targetModel}"), [role="option"]:has-text("${targetModel}"), button:has-text("${targetModel}")`,
+        )
+        .first();
+      if (await option.isVisible().catch(() => false)) {
+        await option.click({ force: true });
+        await page.waitForTimeout(500);
+        return;
+      }
+      await page.keyboard.press('Escape').catch(() => {});
+    }
+
     await page
       .locator(SELECTORS.modelPicker)
       .first()

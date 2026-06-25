@@ -24,7 +24,8 @@ function createModelPage(evaluateResults: unknown[]) {
       state = { first, click, isVisible, waitFor };
       locatorState.set(selector, state);
     }
-    return { first: state.first };
+    const chain = { first: state.first, filter: vi.fn(() => ({ first: state.first })) };
+    return chain;
   });
   return {
     locator,

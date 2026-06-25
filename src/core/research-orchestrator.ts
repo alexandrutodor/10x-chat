@@ -166,29 +166,49 @@ async function activateChatGPTDeepResearchFromComposer(page: Page): Promise<bool
       '[data-testid="composer-plus-btn"], button[aria-label="Add files and more"], button[aria-label*="Add files" i], button[aria-label*="attach" i]',
     )
     .first();
-  let opened = false;
-  const menuVisible = async () =>
-    page
-      .locator(
-        '[role="menu"]:has-text("Deep research"), [data-radix-popper-content-wrapper]:has-text("Deep research")',
-      )
+  await plusButton.waitFor({ state: 'visible', timeout: 20_000 }).catch(async () => {
+    await page
+      .locator('[data-testid="create-new-chat-button"]')
       .first()
-      .isVisible()
-      .catch(() => false);
+      .click({ force: true })
+      .catch(() => {});
+    await page.waitForTimeout(2_000);
+  });
+
+  let opened = false;
+  const menuVisible = () =>
+    page.evaluate(() => {
+      const visible = (el: Element | null): el is HTMLElement => {
+        if (!(el instanceof HTMLElement)) return false;
+        const rect = el.getBoundingClientRect();
+        const style = getComputedStyle(el);
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden'
+        );
+      };
+      return Array.from(
+        document.querySelectorAll('[role="menu"],[data-radix-popper-content-wrapper]'),
+      ).some((el) => {
+        const text = (el.textContent ?? '').replace(/\s+/g, ' ');
+        return visible(el) && /add photos|create image|deep research|web search/i.test(text);
+      });
+    });
 
   for (let attempt = 0; attempt < 3 && !opened; attempt++) {
-    await plusButton.click({ force: true, timeout: 5_000 }).catch(() => {});
-    await page.waitForTimeout(500);
-    opened = await menuVisible();
-    if (opened) break;
-
     const box = await plusButton.boundingBox().catch(() => null);
     if (box) {
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2).catch(() => {});
       await page.mouse.down().catch(() => {});
       await page.waitForTimeout(80);
       await page.mouse.up().catch(() => {});
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(700);
+      opened = await menuVisible();
+    } else {
+      await plusButton.click({ force: true, timeout: 5_000 }).catch(() => {});
+      await page.waitForTimeout(700);
       opened = await menuVisible();
     }
   }
@@ -209,13 +229,12 @@ async function activateChatGPTDeepResearchFromComposer(page: Page): Promise<bool
       const composer = document.querySelector(
         '#prompt-textarea,[data-testid="composer-input"],div[contenteditable="true"],textarea',
       );
-      const composerRect =
-        composer instanceof HTMLElement ? composer.getBoundingClientRect() : null;
+      if (!(composer instanceof HTMLElement)) return false;
+      const composerRect = composer.getBoundingClientRect();
       const buttons = Array.from(document.querySelectorAll('button,[role="button"]')).filter(
         visible,
       );
       const nearComposer = (el: HTMLElement) => {
-        if (!composerRect) return true;
         const rect = el.getBoundingClientRect();
         return Math.abs(rect.top - composerRect.top) < 180 && rect.right < composerRect.right + 260;
       };
@@ -241,6 +260,7 @@ async function activateChatGPTDeepResearchFromComposer(page: Page): Promise<bool
   if (!opened) return false;
   await page.waitForTimeout(700);
 
+  const expandedChatGptResearchSubmenus = new Set<string>();
   for (let attempt = 0; attempt < 12; attempt++) {
     const deepOption = page
       .locator(
@@ -268,30 +288,78 @@ async function activateChatGPTDeepResearchFromComposer(page: Page): Promise<bool
               '[role="menu"],[role="listbox"],[data-radix-popper-content-wrapper],[data-headlessui-portal],[data-floating-ui-portal],[role="dialog"]',
             ),
           );
-          const roots = scopes.length ? scopes : [document.body];
+          const roots = scopes.length ? [...scopes, document.body] : [document.body];
+          const matches: Array<{ el: Element; textMatch: boolean }> = [];
           for (const root of roots) {
-            const candidates = Array.from(
-              root.querySelectorAll(
-                'button,[role="menuitemradio"],[role="menuitem"],[role="option"],[role="button"],a',
-              ),
-            );
-            for (const el of candidates) {
+            for (const el of Array.from(root.querySelectorAll('*'))) {
               if (!visible(el)) continue;
               const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
               const aria = el.getAttribute('aria-label') ?? '';
               const testId = el.getAttribute('data-testid') ?? '';
-              if (!/deep\s+research/i.test(`${text} ${aria} ${testId}`)) continue;
-              (el as HTMLElement).scrollIntoView({ block: 'center', inline: 'center' });
-              (el as HTMLElement).click();
-              return true;
+              const textMatch = /^deep\s+research$/i.test(text);
+              if (!textMatch && !/deep\s+research/i.test(`${aria} ${testId}`)) continue;
+              matches.push({ el, textMatch });
             }
           }
-          return false;
+          const target =
+            matches
+              .map(({ el }) =>
+                el.matches('.__menu-item,[data-radix-collection-item]')
+                  ? el
+                  : el.closest('.__menu-item,[data-radix-collection-item]'),
+              )
+              .find((el): el is Element => Boolean(el) && visible(el)) ??
+            matches
+              .map(({ el }) =>
+                el.closest('[role="menuitemradio"],[role="menuitem"],button,[role="button"],a'),
+              )
+              .find((el): el is Element => Boolean(el) && visible(el)) ??
+            matches.find((match) => match.textMatch)?.el;
+          if (!(target instanceof HTMLElement)) return false;
+          target.scrollIntoView({ block: 'center', inline: 'center' });
+          target.click();
+          return true;
         }),
       );
     if (clicked) {
       await page.waitForTimeout(1_000);
       return true;
+    }
+
+    const submenuLabel = ['Look something up', 'More'].find(
+      (label) => !expandedChatGptResearchSubmenus.has(label),
+    );
+    if (submenuLabel) {
+      const expanded = await page.evaluate((label) => {
+        const visible = (el: Element | null): el is HTMLElement => {
+          if (!(el instanceof HTMLElement)) return false;
+          const rect = el.getBoundingClientRect();
+          const style = getComputedStyle(el);
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== 'none' &&
+            style.visibility !== 'hidden'
+          );
+        };
+        for (const el of Array.from(document.querySelectorAll('*'))) {
+          if (!visible(el)) continue;
+          const text = (el.textContent ?? '').replace(/\s+/g, ' ').trim();
+          if (text !== label) continue;
+          const target =
+            el.closest(
+              '[role="menuitemradio"],[role="menuitem"],button,[role="button"],a,.__menu-item,[data-radix-collection-item]',
+            ) ?? el;
+          (target as HTMLElement).click();
+          return true;
+        }
+        return false;
+      }, submenuLabel);
+      expandedChatGptResearchSubmenus.add(submenuLabel);
+      if (expanded) {
+        await page.waitForTimeout(700);
+        continue;
+      }
     }
 
     const scrolled = await page.evaluate(() => {
@@ -335,7 +403,7 @@ const chatgptResearch: ResearchProviderConfig = {
         };
         return Array.from(
           document.querySelectorAll(
-            '[role="menu"] button,[role="menuitem"],[role="option"],[data-radix-popper-content-wrapper] button,[data-headlessui-portal] button,[data-floating-ui-portal] button,[role="dialog"] button,button',
+            '[role="menu"] button,[role="menuitemradio"],[role="menuitem"],[role="option"],.__menu-item,[data-radix-popper-content-wrapper] button,[data-radix-popper-content-wrapper] .__menu-item,[data-headlessui-portal] button,[data-floating-ui-portal] button,[role="dialog"] button,button',
           ),
         )
           .filter(visible)
