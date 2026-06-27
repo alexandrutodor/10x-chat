@@ -1,27 +1,23 @@
 /**
  * Browser engine abstraction.
  *
- * Tries to use CloakBrowser first, then Patchright,
- * then falls back to Playwright if neither stealth engine is installed.
+ * Tries to use CloakBrowser.
  *
- * CloakBrowser/Patchright reduce automation detection signals that
+ * CloakBrowser reduces automation detection signals that
  * Playwright leaks, making browser automation less likely to trip
  * Cloudflare, DataDome, etc.
- *
- * Both libraries export the same API surface — this module
- * re-exports `chromium` from whichever is available.
  */
 
 import type { BrowserType } from 'playwright';
 
 let _chromium: BrowserType | undefined;
-let _engineName: 'cloakbrowser' | 'patchright' | 'playwright' | 'unknown' = 'unknown';
+let _engineName: 'cloakbrowser' | 'unknown' = 'unknown';
 let _loaded = false;
 
 async function loadEngine(): Promise<BrowserType> {
   if (_chromium) return _chromium;
 
-  // Try CloakBrowser first. It exposes launch helpers, not a BrowserType, so
+  // Try CloakBrowser. It exposes launch helpers, not a BrowserType, so
   // adapt only the two methods 10x-chat uses.
   try {
     const cloakbrowser = await import('cloakbrowser');
@@ -45,31 +41,9 @@ async function loadEngine(): Promise<BrowserType> {
     _engineName = 'cloakbrowser';
     _loaded = true;
     return _chromium;
-  } catch {
-    // CloakBrowser not installed or broken — try Patchright
-  }
-
-  try {
-    const patchright = await import('patchright');
-    if (patchright.chromium) {
-      _chromium = patchright.chromium as unknown as BrowserType;
-      _engineName = 'patchright';
-      _loaded = true;
-      return _chromium;
-    }
-  } catch {
-    // Patchright not installed or broken — fall back to Playwright
-  }
-
-  try {
-    const playwright = await import('playwright');
-    _chromium = playwright.chromium as unknown as BrowserType;
-    _engineName = 'playwright';
-    _loaded = true;
-    return _chromium;
-  } catch {
+  } catch (err) {
     throw new Error(
-      'No browser engine is installed. Run: npm install cloakbrowser playwright-core (recommended), patchright, or playwright',
+      `CloakBrowser is not installed or failed to load. Run: npm install cloakbrowser. Error: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
 }
@@ -80,7 +54,7 @@ export async function getChromium(): Promise<BrowserType> {
 }
 
 /** Which engine is active. Returns 'unknown' if not yet loaded. */
-export function getEngineName(): 'cloakbrowser' | 'patchright' | 'playwright' | 'unknown' {
+export function getEngineName(): 'cloakbrowser' | 'unknown' {
   return _engineName;
 }
 
