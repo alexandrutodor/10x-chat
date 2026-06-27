@@ -18,6 +18,7 @@ export function createResearchCommand(): Command {
     .option('--timeout <ms>', 'Total timeout in milliseconds', '600000')
     .option('--poll-interval <ms>', 'Progress check interval in milliseconds', '5000')
     .option('--save-dir <dir>', 'Directory to save the research report')
+    .option('-a, --attach <paths...>', 'Files to attach to the research prompt')
     .option('--profile <name>', 'Use named browser profile')
     .option('--isolated-profile', 'Use per-provider browser profiles')
     .action(async (options) => {
@@ -56,6 +57,7 @@ export function createResearchCommand(): Command {
           pollIntervalMs,
           model: options.model,
           saveDir: options.saveDir,
+          attach: options.attach,
           isolatedProfile: options.isolatedProfile,
           profile: options.profile,
         });

@@ -41,6 +41,7 @@ function createSubmitPage(options: { contenteditable: boolean; fillFails?: boole
     page: {
       locator,
       keyboard: {
+        type: vi.fn(async () => {}),
         insertText: vi.fn(async () => {}),
         press: vi.fn(async () => {}),
       },
@@ -64,7 +65,7 @@ describe('submitPromptToComposer', () => {
     expect(composer.click).toHaveBeenCalled();
     expect(page.keyboard.press).toHaveBeenCalledWith('ControlOrMeta+a');
     expect(page.keyboard.press).toHaveBeenCalledWith('Backspace');
-    expect(page.keyboard.insertText).toHaveBeenCalledWith('Hello from ProseMirror');
+    expect(page.keyboard.type).toHaveBeenCalledWith('Hello from ProseMirror');
     expect(composer.fill).not.toHaveBeenCalled();
     expect(sendButton.click).toHaveBeenCalled();
   });

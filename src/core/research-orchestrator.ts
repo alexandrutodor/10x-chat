@@ -159,6 +159,13 @@ async function isChatGPTDeepResearchActive(page: Page): Promise<boolean> {
 }
 
 async function activateChatGPTDeepResearchFromComposer(page: Page): Promise<boolean> {
+  await page
+    .locator('[data-testid="create-new-chat-button"]')
+    .first()
+    .click({ force: true })
+    .catch(() => {});
+  await page.waitForTimeout(2_000);
+
   if (await isChatGPTDeepResearchActive(page)) return true;
 
   const plusButton = page
@@ -476,7 +483,10 @@ const chatgptResearch: ResearchProviderConfig = {
       .first()
       .isVisible()
       .catch(() => false);
-    return stopBtn;
+    if (stopBtn) return true;
+    const report = await chatgptResearch.getReport(page);
+    if (report && report.length < 500) return true; // ponytail: ignore short preambles
+    return false;
   },
   async getReport(page: Page) {
     // Wait briefly for /c/<id> navigation if needed
@@ -624,6 +634,14 @@ export async function runResearch(options: ResearchOptions): Promise<ResearchRes
     // Step 1: Activate deep research mode
     console.log(chalk.dim('Activating deep research mode...'));
     await researchConfig.activateResearch(browser.page);
+
+    if (options.attach?.length) {
+      if (!provider.actions.attachFiles) {
+        throw new Error(`${provider.config.displayName} does not support file attachments`);
+      }
+      console.log(chalk.dim(`Attaching ${options.attach.length} file(s)...`));
+      await provider.actions.attachFiles(browser.page, options.attach);
+    }
 
     // Step 2: Submit the research query
     console.log(chalk.dim('Submitting research query...'));

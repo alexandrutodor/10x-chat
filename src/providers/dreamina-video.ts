@@ -340,7 +340,7 @@ export async function typePrompt(page: Page, prompt: string): Promise<void> {
   await composer.click();
   await page.keyboard.press('ControlOrMeta+a');
   await page.keyboard.press('Backspace');
-  await page.keyboard.insertText(prompt);
+  await page.keyboard.type(prompt);
   await page.waitForTimeout(400);
 }
 

@@ -364,8 +364,9 @@ export const chatgptActions: ProviderActions = {
 
     // Current ChatGPT UI shows the thinking/model level as a composer pill near Send.
     const composerPill = page
-      .locator('button.__composer-pill')
-      .filter({ hasText: /Instant|Medium|High|Extra High|Pro Extended|GPT-5\.5/ })
+      .locator(
+        'button.__composer-pill:has-text("Instant"), button.__composer-pill:has-text("Medium"), button.__composer-pill:has-text("High"), button.__composer-pill:has-text("Extra High"), button.__composer-pill:has-text("Pro Extended"), button.__composer-pill:has-text("GPT-5.5")',
+      )
       .first();
     await composerPill.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
     if (await composerPill.isVisible().catch(() => false)) {
@@ -508,7 +509,14 @@ export const chatgptActions: ProviderActions = {
 
     if (pendingFiles.length > 0) {
       await page.locator(SELECTORS.fileInput).first().setInputFiles(pendingFiles);
-      await page.waitForTimeout(5_000);
+      // ponytail: large ZIPs need time to become sendable; wait for upload UI to settle.
+      await page.waitForTimeout(10_000);
+      await page
+        .waitForFunction(
+          () => !/uploading|processing file|preparing file/i.test(document.body?.innerText || ''),
+          { timeout: 120_000 },
+        )
+        .catch(() => {});
       await clickSendButton(page, SELECTORS.sendButton);
       chatgptPendingFiles.delete(page);
     }

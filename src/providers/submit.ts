@@ -106,7 +106,7 @@ export async function submitPromptToComposer(
   if (isContentEditable) {
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.press('Backspace');
-    await page.keyboard.insertText(prompt);
+    await page.keyboard.type(prompt);
     await page.waitForTimeout(100);
 
     const inserted = await composer

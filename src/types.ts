@@ -161,6 +161,7 @@ export interface ResearchOptions {
   /** Optional model/mode to select before activating research (e.g. Gemini Deep Think). */
   model?: string;
   saveDir?: string;
+  attach?: string[];
   isolatedProfile?: boolean;
   /** Named browser profile under ~/.10x-chat/profiles/<name>. */
   profile?: string;
