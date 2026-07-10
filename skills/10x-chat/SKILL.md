@@ -63,6 +63,7 @@ npx 10x-chat@latest login notebooklm
 
 # Chat
 npx 10x-chat@latest chat -p "Review this code for bugs" --provider chatgpt --file "src/**/*.ts"
+npx 10x-chat@latest chat -p "Hard reasoning task" --provider chatgpt --model "GPT-5.6 Sol High"
 npx 10x-chat@latest chat --provider gemini --file "path/to/prompt.md" -p "Complete this task"
 npx 10x-chat@latest chat --provider gemini --model Pro -p "Solve this math problem"
 npx 10x-chat@latest chat --provider gemini --model "Deep Think" -p "Solve this hard problem"
@@ -78,7 +79,7 @@ npx 10x-chat@latest image -p "Watercolor landscape" --provider gemini --save-dir
 # Deep research (long-form, 5-10 min)
 npx 10x-chat@latest research -p "Latest breakthroughs in quantum computing" --provider perplexity
 npx 10x-chat@latest research -p "Hard technical research" --provider gemini --model "Deep Think"
-npx 10x-chat@latest research -p "Market analysis of EVs" --provider chatgpt --timeout 600000
+npx 10x-chat@latest research -p "Market analysis of EVs" --provider chatgpt --model "GPT-5.6 Sol Extra High" --timeout 600000
 
 # Local Gemini Deep Research profile note (ranma/prog)
 # Historical full-report profiles: gemini-2, gemini-3, gemini-4, gemini-5, gemini-12, gemini-15

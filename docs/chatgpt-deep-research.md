@@ -17,7 +17,7 @@ To deselect Deep Research manually, click the active `Deep research` pill/chip i
   --provider chatgpt \
   --profile chatgpt \
   --headed \
-  --model "Extra High" \
+  --model "GPT-5.6 Sol High" \
   --timeout 900000 \
   --save-dir ./reports \
   -p "Research question..."
@@ -36,23 +36,27 @@ Use long timeouts. Real ChatGPT Deep Research can take 5-15+ minutes; a short ti
 
 ## Model / thinking level
 
-In the current ChatGPT UI, the model/thinking level is the pill near the lower-right of the composer, for example `Extra High`.
+In the current ChatGPT UI, the model/thinking level is the pill near the lower-right of the composer, for example `High`. The `Intelligence` menu has levels (`Instant`, `Medium`, `High`, `Extra High`, `Pro`) plus a GPT family submenu (`GPT-5.6 Sol`, `GPT-5.5`, `GPT-5.4`, `GPT-5.3`, `o3`).
 
 Manual selection:
 
 1. Click the model/thinking pill near the send button.
-2. Choose from the `Intelligence` menu: `Instant`, `Medium`, `High`, `Extra High`, `Pro Extended`, or `GPT-5.5`.
+2. Choose an intelligence level.
+3. Open the `GPT-5.6 Sol` submenu if you need a different GPT family.
 
 CLI selection:
 
 ```bash
 10x-chat chat --provider chatgpt --model "Medium" -p "..."
-10x-chat research --provider chatgpt --model "Extra High" -p "..."
+10x-chat chat --provider chatgpt --model "GPT-5.6 Sol High" -p "..."
+10x-chat research --provider chatgpt --model "GPT-5.6 Sol Extra High" -p "..."
 ```
 
 Aliases in code:
 
-- `thinking` / `pro` -> `Pro Extended`
+- `thinking` / `pro` / `pro extended` -> `Pro`
+- `5.6` -> `GPT-5.6 Sol`
+- `5.5`, `5.4`, `5.3`, `o3` -> matching GPT family
 - `xhigh` / `extra high` -> `Extra High`
 - `medium` -> `Medium`
 - `high` -> `High`

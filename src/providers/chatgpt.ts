@@ -44,22 +44,48 @@ export const CHATGPT_CONFIG: ProviderConfig = {
   displayName: 'ChatGPT',
   url: 'https://chatgpt.com',
   loginUrl: 'https://chatgpt.com/auth/login',
-  models: ['Instant', 'Medium', 'High', 'Extra High', 'Pro Extended', 'Thinking', 'GPT-5.5'],
-  defaultModel: 'Pro Extended',
+  models: [
+    'Instant',
+    'Medium',
+    'High',
+    'Extra High',
+    'Pro',
+    'Pro Extended',
+    'Thinking',
+    'GPT-5.6 Sol',
+    'GPT-5.5',
+    'GPT-5.4',
+    'GPT-5.3',
+    'o3',
+  ],
+  defaultModel: 'Pro',
   defaultTimeoutMs: 5 * 60 * 1000,
   // ChatGPT's Cloudflare bot-protection blocks headless Playwright permanently.
   // The chat orchestrator will automatically force headed mode for this provider.
   headlessBlocked: true,
 };
 
-function resolveChatGPTModelLabel(model: string): string {
+function resolveChatGPTModelLabels(model: string): string[] {
   const normalized = normalizeModelLabel(model);
-  if (normalized === 'thinking' || normalized === 'pro') return 'Pro Extended';
-  if (normalized === 'xhigh' || normalized === 'extra high') return 'Extra High';
-  if (normalized === 'medium') return 'Medium';
-  if (normalized === 'high') return 'High';
-  if (normalized === 'instant') return 'Instant';
-  return model;
+  const labels: string[] = [];
+
+  if (/\b5\.6\b/.test(normalized)) labels.push('GPT-5.6 Sol');
+  else if (/\b5\.5\b/.test(normalized)) labels.push('GPT-5.5');
+  else if (/\b5\.4\b/.test(normalized)) labels.push('GPT-5.4');
+  else if (/\b5\.3\b/.test(normalized)) labels.push('GPT-5.3');
+  else if (/\bo3\b/.test(normalized)) labels.push('o3');
+
+  if (normalized.includes('extra high') || normalized === 'xhigh') labels.push('Extra High');
+  else if (normalized.includes('instant')) labels.push('Instant');
+  else if (normalized.includes('medium')) labels.push('Medium');
+  else if (normalized.includes('high')) labels.push('High');
+  else if (normalized.includes('pro') || normalized.includes('thinking')) labels.push('Pro');
+
+  return labels.length > 0 ? labels : [model];
+}
+
+function isChatGPTFamilyLabel(model: string): boolean {
+  return /^(?:GPT-5\.[3-6](?: Sol)?|o3)$/i.test(model);
 }
 
 const SELECTORS = {
@@ -207,6 +233,8 @@ async function clickVisibleModelOption(page: Page, model: string): Promise<boole
         const text = normalizeText(element.textContent);
         return text.includes(modelLabel);
       };
+      const isSubmenuTrigger = (element: Element) =>
+        element.getAttribute('aria-haspopup') === 'menu' || element.hasAttribute('data-has-submenu');
       const isExcluded = (element: Element) =>
         Boolean(
           excludedSelector &&
@@ -217,7 +245,7 @@ async function clickVisibleModelOption(page: Page, model: string): Promise<boole
         const scopes = Array.from(document.querySelectorAll(scopeSelector));
         for (const scope of scopes) {
           const option = Array.from(scope.querySelectorAll(optionSelector)).find((element) => {
-            return isVisible(element) && matchesModel(element);
+            return isVisible(element) && matchesModel(element) && !isSubmenuTrigger(element);
           });
           if (option instanceof HTMLElement) {
             option.click();
@@ -228,7 +256,12 @@ async function clickVisibleModelOption(page: Page, model: string): Promise<boole
 
       const fallbackOption = Array.from(document.querySelectorAll(optionSelector)).find(
         (element) => {
-          return isVisible(element) && !isExcluded(element) && matchesModel(element);
+          return (
+            isVisible(element) &&
+            !isExcluded(element) &&
+            matchesModel(element) &&
+            !isSubmenuTrigger(element)
+          );
         },
       );
 
@@ -360,73 +393,90 @@ export class CloudflareBlockedError extends Error {
 export const chatgptActions: ProviderActions = {
   async selectModel(page: Page, model: string): Promise<void> {
     await dismissOverlays(page);
-    const targetModel = resolveChatGPTModelLabel(model);
 
-    // Current ChatGPT UI shows the thinking/model level as a composer pill near Send.
-    const composerPill = page
-      .locator(
-        'button.__composer-pill:has-text("Instant"), button.__composer-pill:has-text("Medium"), button.__composer-pill:has-text("High"), button.__composer-pill:has-text("Extra High"), button.__composer-pill:has-text("Pro Extended"), button.__composer-pill:has-text("GPT-5.5")',
-      )
-      .first();
-    await composerPill.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
-    if (await composerPill.isVisible().catch(() => false)) {
-      const current = (await composerPill.textContent().catch(() => '')) ?? '';
-      if (normalizeModelLabel(current) === normalizeModelLabel(targetModel)) return;
-      await composerPill.click({ force: true }).catch(() => {});
-      await page.waitForTimeout(750);
-      const option = page
+    for (const targetModel of resolveChatGPTModelLabels(model)) {
+      // Current ChatGPT UI shows the thinking/model level as a composer pill near Send.
+      const composerPill = page
         .locator(
-          `[role="menuitemradio"]:has-text("${targetModel}"), [role="menuitem"]:has-text("${targetModel}"), [role="option"]:has-text("${targetModel}"), button:has-text("${targetModel}")`,
+          'button.__composer-pill:has-text("Instant"), button.__composer-pill:has-text("Medium"), button.__composer-pill:has-text("High"), button.__composer-pill:has-text("Extra High"), button.__composer-pill:has-text("Pro"), button.__composer-pill:has-text("GPT-5")',
         )
         .first();
-      if (await option.isVisible().catch(() => false)) {
-        await option.click({ force: true });
-        await page.waitForTimeout(500);
+      await composerPill.waitFor({ state: 'visible', timeout: 10_000 }).catch(() => {});
+      if (await composerPill.isVisible().catch(() => false)) {
+        const current = (await composerPill.textContent().catch(() => '')) ?? '';
+        if (normalizeModelLabel(current) === normalizeModelLabel(targetModel)) continue;
+        await composerPill.click({ force: true }).catch(() => {});
+        await page.waitForTimeout(750);
+        if (isChatGPTFamilyLabel(targetModel)) {
+          await page
+            .locator('[role="menuitem"][aria-haspopup="menu"]:has-text("GPT-5")')
+            .first()
+            .hover()
+            .catch(() => {});
+          await page.waitForTimeout(500);
+        }
+        const option = page
+          .locator(
+            `[role="menuitemradio"]:has-text("${targetModel}"), [role="option"]:has-text("${targetModel}"), button:has-text("${targetModel}")`,
+          )
+          .first();
+        if (await option.isVisible().catch(() => false)) {
+          await option.click({ force: true });
+          await page.waitForTimeout(500);
+          continue;
+        }
+        await page.keyboard.press('Escape').catch(() => {});
+      }
+
+      await page
+        .locator(SELECTORS.modelPicker)
+        .first()
+        .waitFor({ state: 'visible', timeout: 15_000 })
+        .catch(() => {});
+      await page.waitForTimeout(500);
+      const picker = await getVisibleModelPickerState(page);
+      if (!picker.found) {
+        console.warn(
+          `ChatGPT model picker not found — skipping model selection for "${targetModel}"`,
+        );
         return;
       }
-      await page.keyboard.press('Escape').catch(() => {});
+
+      if (normalizeModelLabel(picker.text) === normalizeModelLabel(targetModel)) {
+        continue;
+      }
+
+      const pickerClicked = await page.evaluate((sel: string) => {
+        const visible = (el: Element): el is HTMLElement => {
+          if (!(el instanceof HTMLElement)) return false;
+          const rect = el.getBoundingClientRect();
+          const style = getComputedStyle(el);
+          return rect.width > 0 && rect.height > 0 && style.display !== 'none';
+        };
+        const button = Array.from(document.querySelectorAll(sel)).find(visible);
+        button?.click();
+        return Boolean(button);
+      }, SELECTORS.modelPicker);
+      if (!pickerClicked) return;
+      await page.waitForTimeout(750);
+
+      if (isChatGPTFamilyLabel(targetModel)) {
+        await page
+          .locator('[role="menuitem"][aria-haspopup="menu"]:has-text("GPT-5")')
+          .first()
+          .hover()
+          .catch(() => {});
+        await page.waitForTimeout(500);
+      }
+      const optionClicked = await clickVisibleModelOption(page, targetModel);
+      if (!optionClicked) {
+        console.warn(`Model "${targetModel}" not found in ChatGPT picker — using current model`);
+        await page.keyboard.press('Escape').catch(() => {});
+        return;
+      }
+
+      await page.waitForTimeout(500);
     }
-
-    await page
-      .locator(SELECTORS.modelPicker)
-      .first()
-      .waitFor({ state: 'visible', timeout: 15_000 })
-      .catch(() => {});
-    await page.waitForTimeout(500);
-    const picker = await getVisibleModelPickerState(page);
-    if (!picker.found) {
-      console.warn(
-        `ChatGPT model picker not found — skipping model selection for "${targetModel}"`,
-      );
-      return;
-    }
-
-    if (normalizeModelLabel(picker.text) === normalizeModelLabel(targetModel)) {
-      return;
-    }
-
-    const pickerClicked = await page.evaluate((sel: string) => {
-      const visible = (el: Element): el is HTMLElement => {
-        if (!(el instanceof HTMLElement)) return false;
-        const rect = el.getBoundingClientRect();
-        const style = getComputedStyle(el);
-        return rect.width > 0 && rect.height > 0 && style.display !== 'none';
-      };
-      const button = Array.from(document.querySelectorAll(sel)).find(visible);
-      button?.click();
-      return Boolean(button);
-    }, SELECTORS.modelPicker);
-    if (!pickerClicked) return;
-    await page.waitForTimeout(750);
-
-    const optionClicked = await clickVisibleModelOption(page, targetModel);
-    if (!optionClicked) {
-      console.warn(`Model "${targetModel}" not found in ChatGPT picker — using current model`);
-      await page.keyboard.press('Escape').catch(() => {});
-      return;
-    }
-
-    await page.waitForTimeout(500);
   },
 
   async isLoggedIn(page: Page): Promise<boolean> {

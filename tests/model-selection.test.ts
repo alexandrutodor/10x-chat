@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { chatgptActions } from '../src/providers/chatgpt.js';
+import { CHATGPT_CONFIG, chatgptActions } from '../src/providers/chatgpt.js';
 import { claudeActions } from '../src/providers/claude.js';
 import { grokActions } from '../src/providers/grok.js';
 
@@ -39,6 +39,12 @@ function createModelPage(evaluateResults: unknown[]) {
 }
 
 describe('Model selection uses Playwright locator clicks to open the menu', () => {
+  it('lists the current ChatGPT intelligence levels and GPT family models', () => {
+    expect(CHATGPT_CONFIG.defaultModel).toBe('Pro');
+    expect(CHATGPT_CONFIG.models).toContain('GPT-5.6 Sol');
+    expect(CHATGPT_CONFIG.models).toContain('Pro');
+  });
+
   it('selects a ChatGPT model through the composer model picker', async () => {
     const page = createModelPage([{ found: true, text: 'Pro Extended' }, true, true]);
 

@@ -67,7 +67,7 @@ npx 10x-chat@latest chat -p "Long task" --timeout 600000 --headed  # 10min timeo
 |------|-------------|
 | `-p, --prompt <text>` | **(required)** The prompt to send |
 | `--provider <name>` | Provider: `chatgpt`, `gemini`, `claude`, `grok`, `perplexity`, `notebooklm` (default: config) |
-| `--model <name>` | Model/mode to select in the provider UI (e.g. Gemini: `Fast`, `Thinking`, `Deep Think`, `Pro`) |
+| `--model <name>` | Model/mode to select in the provider UI (e.g. ChatGPT: `GPT-5.6 Sol High`, `Pro`; Gemini: `Fast`, `Thinking`, `Deep Think`, `Pro`) |
 | `-f, --file <paths...>` | Files/globs to bundle as context |
 | `--copy` | Copy bundle to clipboard instead of sending |
 | `--dry-run` | Preview the bundle without sending |
@@ -143,7 +143,7 @@ npx 10x-chat@latest research -p "Compare React vs Vue in 2026" --provider perple
 
 #### ChatGPT Deep Research
 
-ChatGPT Deep Research is selected from the composer `+` (`Add files and more`) menu, then verified by the active `Deep research` pill before the prompt is submitted. Model/thinking level is selected separately from the composer model pill (`Instant`, `Medium`, `High`, `Extra High`, `Pro Extended`, `GPT-5.5`). See [`docs/chatgpt-deep-research.md`](docs/chatgpt-deep-research.md).
+ChatGPT Deep Research is selected from the composer `+` (`Add files and more`) menu, then verified by the active `Deep research` pill before the prompt is submitted. Model/thinking level is selected separately from the composer model pill (`Instant`, `Medium`, `High`, `Extra High`, `Pro`) and the GPT family submenu (`GPT-5.6 Sol`, `GPT-5.5`, `GPT-5.4`, `GPT-5.3`, `o3`). You can combine both in one `--model`, e.g. `--model "GPT-5.6 Sol High"`. See [`docs/chatgpt-deep-research.md`](docs/chatgpt-deep-research.md).
 
 ### `video`
 
