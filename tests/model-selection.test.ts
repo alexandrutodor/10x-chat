@@ -12,6 +12,8 @@ function createModelPage(evaluateResults: unknown[]) {
       click: ReturnType<typeof vi.fn>;
       isVisible: ReturnType<typeof vi.fn>;
       waitFor: ReturnType<typeof vi.fn>;
+      hover: ReturnType<typeof vi.fn>;
+      textContent: ReturnType<typeof vi.fn>;
     }
   >();
   const locator = vi.fn((selector: string) => {
@@ -20,8 +22,10 @@ function createModelPage(evaluateResults: unknown[]) {
       const click = vi.fn(async () => {});
       const isVisible = vi.fn(async () => false);
       const waitFor = vi.fn(async () => {});
-      const first = vi.fn(() => ({ click, isVisible, waitFor }));
-      state = { first, click, isVisible, waitFor };
+      const hover = vi.fn(async () => {});
+      const textContent = vi.fn(async () => '');
+      const first = vi.fn(() => ({ click, isVisible, waitFor, hover, textContent }));
+      state = { first, click, isVisible, waitFor, hover, textContent };
       locatorState.set(selector, state);
     }
     const chain = { first: state.first, filter: vi.fn(() => ({ first: state.first })) };
@@ -46,7 +50,7 @@ describe('Model selection uses Playwright locator clicks to open the menu', () =
   });
 
   it('selects a ChatGPT model through the composer model picker', async () => {
-    const page = createModelPage([{ found: true, text: 'Pro Extended' }, true, true]);
+    const page = createModelPage([{ found: true, text: 'Pro' }, true, true]);
 
     await chatgptActions.selectModel(page as never, 'Instant');
 
@@ -54,6 +58,33 @@ describe('Model selection uses Playwright locator clicks to open the menu', () =
     expect(page.waitForTimeout).toHaveBeenCalledWith(750);
     expect(page.waitForTimeout).toHaveBeenCalledWith(500);
     expect(page.keyboard.press).not.toHaveBeenCalled();
+  });
+
+  it('selects the GPT-5.6 family and High intelligence in two steps', async () => {
+    const page = createModelPage([]);
+    const composerSelector =
+      'button.__composer-pill:has-text("Instant"), button.__composer-pill:has-text("Medium"), button.__composer-pill:has-text("High"), button.__composer-pill:has-text("Extra High"), button.__composer-pill:has-text("Pro"), button.__composer-pill:has-text("GPT-5")';
+    const familyMenuSelector = '[role="menuitem"][aria-haspopup="menu"]:has-text("GPT-5")';
+    const familyOptionSelector =
+      '[role="menuitemradio"]:has-text("GPT-5.6 Sol"), [role="option"]:has-text("GPT-5.6 Sol"), button:has-text("GPT-5.6 Sol")';
+    const levelOptionSelector =
+      '[role="menuitemradio"]:has-text("High"), [role="option"]:has-text("High"), button:has-text("High")';
+
+    const composer = page.locator(composerSelector).first();
+    const familyMenu = page.locator(familyMenuSelector).first();
+    const familyOption = page.locator(familyOptionSelector).first();
+    const levelOption = page.locator(levelOptionSelector).first();
+    page.__locatorState.get(composerSelector)?.isVisible.mockResolvedValue(true);
+    page.__locatorState.get(composerSelector)?.textContent.mockResolvedValue('Pro');
+    page.__locatorState.get(familyOptionSelector)?.isVisible.mockResolvedValue(true);
+    page.__locatorState.get(levelOptionSelector)?.isVisible.mockResolvedValue(true);
+
+    await chatgptActions.selectModel(page as never, 'GPT-5.6 Sol High');
+
+    expect(composer.click).toHaveBeenCalledTimes(2);
+    expect(familyMenu.hover).toHaveBeenCalledTimes(1);
+    expect(familyOption.click).toHaveBeenCalledTimes(1);
+    expect(levelOption.click).toHaveBeenCalledTimes(1);
   });
 
   it('warns and escapes when the Claude model option is missing', async () => {

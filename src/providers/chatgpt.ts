@@ -234,7 +234,8 @@ async function clickVisibleModelOption(page: Page, model: string): Promise<boole
         return text.includes(modelLabel);
       };
       const isSubmenuTrigger = (element: Element) =>
-        element.getAttribute('aria-haspopup') === 'menu' || element.hasAttribute('data-has-submenu');
+        element.getAttribute('aria-haspopup') === 'menu' ||
+        element.hasAttribute('data-has-submenu');
       const isExcluded = (element: Element) =>
         Boolean(
           excludedSelector &&
