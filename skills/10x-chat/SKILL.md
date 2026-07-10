@@ -19,13 +19,14 @@ Use 10x-chat to send prompts to web-based AI agents via automated browser sessio
 
 ## Installation
 
-No install needed. Always use `@latest`:
+Use the local wrapper, which runs `/home/ranma/prog/10x-chat/dist/bin/cli.js`:
 
 ```bash
-npx 10x-chat@latest --version
+command -v 10x-chat
+10x-chat --version
 ```
 
-Use `npx` (not `bunx` — symlink conflicts in parallel).
+Do not use `npx 10x-chat@latest`; npm does not contain this fork's GPT-5.6 changes.
 
 ## When to use
 
@@ -44,7 +45,7 @@ Use `npx` (not `bunx` — symlink conflicts in parallel).
 | chatgpt | ✅ | ✅ (DALL-E) | ✅ | ❌ | — | Runs headed by default (anti-bot) |
 | gemini | ✅ | ✅ (Imagen) | ✅ | ❌ | Fast, **Thinking** (default), Deep Think (Ultra tool), Pro | `--model` switches mode |
 | claude | ✅ | ❌ | ❌ | ❌ | — | Runs headed by default |
-| grok | ✅ | ✅ | ❌ | ❌ | — | UI changes often, use `@latest` |
+| grok | ✅ | ✅ | ❌ | ❌ | — | UI changes often; keep the local checkout current |
 | perplexity | ✅ | ❌ | ✅ | ❌ | — | Best for research with citations |
 | notebooklm | ✅ | ❌ | ❌ | ❌ | — | Add sources first, then chat |
 | flow | ❌ | ❌ | ❌ | ✅ (Veo) | **Omni Flash** (default), Veo 3.1 Lite/Fast/Quality | Google login (shared with Gemini) |
@@ -54,32 +55,32 @@ Use `npx` (not `bunx` — symlink conflicts in parallel).
 
 ```bash
 # Login (one-time per provider — opens browser for auth)
-npx 10x-chat@latest login chatgpt
-npx 10x-chat@latest login gemini
-npx 10x-chat@latest login claude
-npx 10x-chat@latest login grok
-npx 10x-chat@latest login perplexity
-npx 10x-chat@latest login notebooklm
+10x-chat login chatgpt
+10x-chat login gemini
+10x-chat login claude
+10x-chat login grok
+10x-chat login perplexity
+10x-chat login notebooklm
 
 # Chat
-npx 10x-chat@latest chat -p "Review this code for bugs" --provider chatgpt --file "src/**/*.ts"
-npx 10x-chat@latest chat -p "Hard reasoning task" --provider chatgpt --model "GPT-5.6 Sol High"
-npx 10x-chat@latest chat --provider gemini --file "path/to/prompt.md" -p "Complete this task"
-npx 10x-chat@latest chat --provider gemini --model Pro -p "Solve this math problem"
-npx 10x-chat@latest chat --provider gemini --model "Deep Think" -p "Solve this hard problem"
+10x-chat chat -p "Review this code for bugs" --provider chatgpt --file "src/**/*.ts"
+10x-chat chat -p "Hard reasoning task" --provider chatgpt --model "GPT-5.6 Sol High"
+10x-chat chat --provider gemini --file "path/to/prompt.md" -p "Complete this task"
+10x-chat chat --provider gemini --model Pro -p "Solve this math problem"
+10x-chat chat --provider gemini --model "Deep Think" -p "Solve this hard problem"
 
 # Multi-step provider delegate for external AI callers (JSONL over stdin/stdout)
-npx 10x-chat@latest delegate gemini --model Pro
+10x-chat delegate gemini --model Pro
 # then send JSON lines: {"action":"status"}, {"action":"submit","prompt":"..."}, {"action":"capture"}, {"action":"close"}
 
 # Image generation
-npx 10x-chat@latest image -p "A fox astronaut in space" --provider chatgpt
-npx 10x-chat@latest image -p "Watercolor landscape" --provider gemini --save-dir ./images
+10x-chat image -p "A fox astronaut in space" --provider chatgpt
+10x-chat image -p "Watercolor landscape" --provider gemini --save-dir ./images
 
 # Deep research (long-form, 5-10 min)
-npx 10x-chat@latest research -p "Latest breakthroughs in quantum computing" --provider perplexity
-npx 10x-chat@latest research -p "Hard technical research" --provider gemini --model "Deep Think"
-npx 10x-chat@latest research -p "Market analysis of EVs" --provider chatgpt --model "GPT-5.6 Sol Extra High" --timeout 600000
+10x-chat research -p "Latest breakthroughs in quantum computing" --provider perplexity
+10x-chat research -p "Hard technical research" --provider gemini --model "Deep Think"
+10x-chat research -p "Market analysis of EVs" --provider chatgpt --model "GPT-5.6 Sol Extra High" --timeout 600000
 
 # Local Gemini Deep Research profile note (ranma/prog)
 # Historical full-report profiles: gemini-2, gemini-3, gemini-4, gemini-5, gemini-12, gemini-15
@@ -88,33 +89,33 @@ npx 10x-chat@latest research -p "Market analysis of EVs" --provider chatgpt --mo
 # Use the above profiles for parallel targeted Deep Research only after login is revalidated; validate every report is non-placeholder.
 
 # Video generation (Flow / Veo default, or Dreamina / Seedance)
-npx 10x-chat@latest video -p "Drone shot over snowy peaks at sunrise" --provider flow
-npx 10x-chat@latest video -p "She walks, TikTok style" --provider flow --orientation portrait --duration 8 --image ref.png  # 9:16 i2v
-npx 10x-chat@latest video -p "Neon street, rain" --provider flow --model "Veo 3.1 - Quality" --duration 10
-npx 10x-chat@latest login dreamina   # one-time CapCut login for Dreamina
-npx 10x-chat@latest video -p "A paper boat in a rain gutter, macro" --provider dreamina --aspect 9:16 --dreamina-duration 4
-npx 10x-chat@latest video -p "The glowing orb floats up" --provider dreamina --image ref.png --ref-mode omni
+10x-chat video -p "Drone shot over snowy peaks at sunrise" --provider flow
+10x-chat video -p "She walks, TikTok style" --provider flow --orientation portrait --duration 8 --image ref.png  # 9:16 i2v
+10x-chat video -p "Neon street, rain" --provider flow --model "Veo 3.1 - Quality" --duration 10
+10x-chat login dreamina   # one-time CapCut login for Dreamina
+10x-chat video -p "A paper boat in a rain gutter, macro" --provider dreamina --aspect 9:16 --dreamina-duration 4
+10x-chat video -p "The glowing orb floats up" --provider dreamina --image ref.png --ref-mode omni
 
 # Dry run / clipboard
-npx 10x-chat@latest chat --dry-run -p "Debug this error" --file src/
-npx 10x-chat@latest chat --copy -p "Explain this" --file "src/**"
+10x-chat chat --dry-run -p "Debug this error" --file src/
+10x-chat chat --copy -p "Explain this" --file "src/**"
 
 # Provider chat history + local session management
-npx 10x-chat@latest history --provider gemini
-npx 10x-chat@latest history --provider all --limit 10
-npx 10x-chat@latest status
-npx 10x-chat@latest session <id> --render
+10x-chat history --provider gemini
+10x-chat history --provider all --limit 10
+10x-chat status
+10x-chat session <id> --render
 
 # NotebookLM
-npx 10x-chat@latest notebooklm list
-npx 10x-chat@latest notebooklm create "My Research"
-npx 10x-chat@latest notebooklm add-url <id> https://...
-npx 10x-chat@latest notebooklm add-file <id> ./paper.pdf
-npx 10x-chat@latest notebooklm sources <id>
-npx 10x-chat@latest notebooklm summarize <id>
+10x-chat notebooklm list
+10x-chat notebooklm create "My Research"
+10x-chat notebooklm add-url <id> https://...
+10x-chat notebooklm add-file <id> ./paper.pdf
+10x-chat notebooklm sources <id>
+10x-chat notebooklm summarize <id>
 
 # Install bundled skill to coding agent
-npx 10x-chat@latest skill install
+10x-chat skill install
 ```
 
 ## Provider delegate (v0.10.18+)
@@ -122,7 +123,7 @@ npx 10x-chat@latest skill install
 Use `delegate <provider>` when an external AI caller needs flexible multi-step control instead of a single one-shot `chat`, `image`, or `research` command. It opens one provider tab, keeps it alive, reads JSONL commands from stdin, and emits JSONL responses on stdout.
 
 ```bash
-npx 10x-chat@latest delegate gemini --model Pro <<'EOF'
+10x-chat delegate gemini --model Pro <<'EOF'
 {"id":1,"action":"status"}
 {"id":2,"action":"submit","prompt":"Draft three launch angles for this product."}
 {"id":3,"action":"capture","timeoutMs":600000}
@@ -130,7 +131,7 @@ npx 10x-chat@latest delegate gemini --model Pro <<'EOF'
 EOF
 
 printf '%s\n' '{"action":"chat","model":"Thinking","prompt":"Review this pasted plan."}' \
-  | npx 10x-chat@latest delegate gemini
+  | 10x-chat delegate gemini
 ```
 
 Actions:
@@ -152,14 +153,14 @@ HTTP daemon makes parallel runs stable. All providers share one Chrome:
 
 ```bash
 # Login all once
-npx 10x-chat@latest login gemini
-npx 10x-chat@latest login claude
-npx 10x-chat@latest login chatgpt
+10x-chat login gemini
+10x-chat login claude
+10x-chat login chatgpt
 
 # Run concurrently — each opens a tab in the shared daemon
-npx 10x-chat@latest chat --provider gemini -p "Your prompt" --file context.md &
-npx 10x-chat@latest chat --provider claude -p "Your prompt" --file context.md &
-npx 10x-chat@latest chat --provider chatgpt -p "Your prompt" --file context.md &
+10x-chat chat --provider gemini -p "Your prompt" --file context.md &
+10x-chat chat --provider claude -p "Your prompt" --file context.md &
+10x-chat chat --provider chatgpt -p "Your prompt" --file context.md &
 wait
 ```
 
@@ -179,7 +180,7 @@ The daemon stores the headless/headed mode in its state file. If you switch mode
 
 ```bash
 # Migrate from isolated to shared
-npx 10x-chat@latest migrate
+10x-chat migrate
 ```
 
 ## ChatGPT chat/artifact workflow for this machine
@@ -236,7 +237,7 @@ kill $(cat ~/.10x-chat/browser-daemon.json | python3 -c "import sys,json; print(
 
 ## Tips
 
-- **Always use `@latest`**: ensures newest fixes
+- **Always use local `10x-chat`**: it includes this fork's unreleased fixes
 - **Login first**: `login <provider>` once per provider. Sessions persist in `~/.10x-chat/profiles/`
 - **Use `--headed`** if a provider is flaky (Grok especially)
 - **Keep file sets small**: fewer files + focused prompt = better answers
@@ -250,7 +251,7 @@ kill $(cat ~/.10x-chat/browser-daemon.json | python3 -c "import sys,json; print(
 
 ## Known issues
 
-- **Grok**: UI changes frequently. Always use `@latest`. Use `--headed` for best reliability
+- **Grok**: UI changes frequently. Keep the local checkout current and use `--headed` for best reliability
 - **ChatGPT/Grok sessions expire quickly**: login again if you get "Not logged in" errors
 - **ChatGPT notice modals**: use the CloakBrowser helper; it clicks OK/Got-it or removes dismissible "Too many requests" overlays. If one still appears, click OK/Got-it and continue. If `RATE_LIMIT_EXCEEDED` remains, cooldown instead of hammering.
 - **Some provider UIs are flaky under automation**: retry with `--headed` before assuming a hard failure
