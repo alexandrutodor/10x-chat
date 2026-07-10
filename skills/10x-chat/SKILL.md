@@ -1,6 +1,6 @@
 ---
 name: 10x-chat
-description: Chat with web AI agents (ChatGPT, Gemini, Claude, Grok, Perplexity, NotebookLM) via browser automation. Use when stuck, need cross-validation, want a second-model review, need image generation, want deep research, or want to generate video (Google Flow/Veo, Dreamina/Seedance) from web AI tools.
+description: Chat with web AI agents (ChatGPT, Gemini, Claude, Grok, Perplexity, NotebookLM) via browser automation. Use when stuck, need cross-validation, want a second-model review, need image generation, want deep research, want to generate video (Google Flow/Veo, Dreamina/Seedance), or need to inspect ChatGPT chats, download ChatGPT artifacts/ZIPs, or upload files to ChatGPT.
 ---
 
 # 10x-chat — AI Agent Skill
@@ -79,6 +79,12 @@ npx 10x-chat@latest image -p "Watercolor landscape" --provider gemini --save-dir
 npx 10x-chat@latest research -p "Latest breakthroughs in quantum computing" --provider perplexity
 npx 10x-chat@latest research -p "Hard technical research" --provider gemini --model "Deep Think"
 npx 10x-chat@latest research -p "Market analysis of EVs" --provider chatgpt --timeout 600000
+
+# Local Gemini Deep Research profile note (ranma/prog)
+# Historical full-report profiles: gemini-2, gemini-3, gemini-4, gemini-5, gemini-12, gemini-15
+# Historical toggle-available profiles, not full-report tested: gemini-6, gemini-13, gemini-14, gemini-16
+# Revalidate before use: on 2026-06-25 these ~/.10x-chat/profiles had no Google SID/LSID auth cookies and opened signed-out Gemini.
+# Use the above profiles for parallel targeted Deep Research only after login is revalidated; validate every report is non-placeholder.
 
 # Video generation (Flow / Veo default, or Dreamina / Seedance)
 npx 10x-chat@latest video -p "Drone shot over snowy peaks at sunrise" --provider flow
@@ -175,6 +181,47 @@ The daemon stores the headless/headed mode in its state file. If you switch mode
 npx 10x-chat@latest migrate
 ```
 
+## ChatGPT chat/artifact workflow for this machine
+
+Hard rule for this user: use **only CloakBrowser-backed tooling** for ChatGPT browser work. Do not use normal Playwright, Puppeteer, Chromium scripts, or the generic 10x-chat daemon/chat/history commands for ChatGPT unless the user explicitly overrides this rule. For real ChatGPT account checks, **do not trust `login --status`**; validate via the CloakBrowser helper by inspecting/listing real UI state.
+
+For ChatGPT sidebar inspection, downloading artifact buttons, uploading files, and polling, use the bundled CloakBrowser helper. Resolve `$SKILL_DIR` to this skill directory. The helper clears dismissible ChatGPT notices, including the intermittent "Too many requests" OK/Got-it modal, before acting. If a notice still appears, it is usually safe to click OK/Got-it and continue. If it returns `RATE_LIMIT_EXCEEDED`, treat that as a real backend block and wait/back off instead of retrying in a tight loop.
+
+```bash
+SKILL_DIR=/home/ranma/.pi/agent/skills/10x-chat
+
+# List visible ChatGPT chats (CloakBrowser only)
+xvfb-run -a node "$SKILL_DIR/scripts/chatgpt-files.mjs" list --limit 12
+
+# Inspect a conversation for downloadable artifacts/buttons
+xvfb-run -a node "$SKILL_DIR/scripts/chatgpt-files.mjs" inspect \
+  --url "https://chatgpt.com/c/<conversation-id>"
+
+# Download the latest matching artifact button from a conversation
+xvfb-run -a node "$SKILL_DIR/scripts/chatgpt-files.mjs" download \
+  --url "https://chatgpt.com/c/<conversation-id>" \
+  --label "Download the full updated code ZIP" \
+  --out-dir /home/ranma/tmp/10xchat-chatgpt-downloads
+
+# Download from a specific turn when there are multiple artifact sets
+xvfb-run -a node "$SKILL_DIR/scripts/chatgpt-files.mjs" download \
+  --url "https://chatgpt.com/c/<conversation-id>" \
+  --turn 8 \
+  --label "Download the full updated code ZIP"
+
+# Upload files into ChatGPT and submit a prompt (CloakBrowser only); omit --file for a prompt-only nudge.
+xvfb-run -a node "$SKILL_DIR/scripts/chatgpt-files.mjs" upload \
+  --file /path/to/file.zip \
+  --prompt "Use this uploaded file and summarize the implementation."
+```
+
+After downloading a ZIP, always verify it before claiming success:
+
+```bash
+sha256sum /path/to/file.zip
+unzip -t /path/to/file.zip
+```
+
 ## Daemon management
 
 ```bash
@@ -204,6 +251,7 @@ kill $(cat ~/.10x-chat/browser-daemon.json | python3 -c "import sys,json; print(
 
 - **Grok**: UI changes frequently. Always use `@latest`. Use `--headed` for best reliability
 - **ChatGPT/Grok sessions expire quickly**: login again if you get "Not logged in" errors
+- **ChatGPT notice modals**: use the CloakBrowser helper; it clicks OK/Got-it or removes dismissible "Too many requests" overlays. If one still appears, click OK/Got-it and continue. If `RATE_LIMIT_EXCEEDED` remains, cooldown instead of hammering.
 - **Some provider UIs are flaky under automation**: retry with `--headed` before assuming a hard failure
 
 ## Safety
